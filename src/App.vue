@@ -5,7 +5,7 @@ import SideBar from '@/components/SideBar.vue'
 
 <template>
   <el-container>
-    <el-header>基于可编程数据平面的智能数据包分类与梯度聚合优化系统</el-header>
+    <el-header>面向高速网络的智能包匹配引擎</el-header>
     <el-container>
       <el-aside width="fit-content">
         <SideBar />
@@ -25,7 +25,7 @@ import SideBar from '@/components/SideBar.vue'
 </style>
 <style scoped>
 .el-header {
-  background-color: rgb(42, 107, 168);
+  background-color: rgb(227, 151, 0);
   color: #ffffff;
   text-align: center;
 

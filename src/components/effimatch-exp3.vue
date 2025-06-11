@@ -1,8 +1,9 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">查询吞吐量</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">分类延迟分析 (MBitTree)</div>
+
   <div
     ref="chartContainer"
-    style="width: 100%; height: 220px"
+    style="width: 100%; height: 240px"
     :style="{
       opacity: globalStore.isStarted ? 1 : 0
     }"
@@ -10,28 +11,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
+
+// --- 1. 响应式状态定义 ---
 
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
 const globalStore = useGlobalStore()
 
-const selectedSize = ref<string>(globalStore.ruleScale)
-
+const selectedCategory = ref<string>(globalStore.ruleCategory)
 let intervalId: number | null = null
 
+// --- 2. 生命周期和图表实例管理 ---
+
 onMounted(() => {
-  globalStore.registerRefreshFunction('exp3', (size: string) => {
-    selectedSize.value = size
+  globalStore.registerRefreshFunction('transexp3', () => {
+    // 使用新的唯一key
+    selectedCategory.value = globalStore.ruleCategory
   })
-  globalStore.registerClearFunction('exp3', () => {
-    selectedSize.value = 'null'
+  globalStore.registerClearFunction('transexp3', () => {
+    selectedCategory.value = 'null'
   })
+
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    myChart.setOption(chartOptions.value)
+    myChart.setOption(getChartOptions())
     startDataFluctuation()
   }
 })
@@ -50,48 +56,81 @@ watchEffect(() => {
   })
 })
 
+// --- 3. 图表数据 ---
+
+// ✨ 1. 数据更新：使用新图表的数据
 const originalData = {
-  '1k': [
-    { category: 'acl1', EffiMatch: 13.5, NeuTree: 12.5, NuevoMatch: 0.5 },
-    { category: 'acl2', EffiMatch: 11.5, NeuTree: 9.5, NuevoMatch: 0.5 },
-    { category: 'acl3', EffiMatch: 12.0, NeuTree: 9.5, NuevoMatch: 0.5 },
-    { category: 'acl4', EffiMatch: 11.5, NeuTree: 9.5, NuevoMatch: 1.5 },
-    { category: 'acl5', EffiMatch: 10.0, NeuTree: 9.5, NuevoMatch: 1.0 },
-    { category: 'fw1', EffiMatch: 9.5, NeuTree: 8.0, NuevoMatch: 1.0 },
-    { category: 'fw2', EffiMatch: 14.0, NeuTree: 9.5, NuevoMatch: 1.5 },
-    { category: 'fw3', EffiMatch: 9.0, NeuTree: 8.0, NuevoMatch: 0.5 },
-    { category: 'fw4', EffiMatch: 9.0, NeuTree: 8.5, NuevoMatch: 1.5 },
-    { category: 'fw5', EffiMatch: 12.0, NeuTree: 9.5, NuevoMatch: 1.0 },
-    { category: 'ipc1', EffiMatch: 14.0, NeuTree: 12.5, NuevoMatch: 5.5 },
-    { category: 'ipc2', EffiMatch: 14.0, NeuTree: 10.5, NuevoMatch: 1.5 }
+  acl: [
+    {
+      name: 'MBitTree w/ TransTuple',
+      data: [
+        [0, 0.28],
+        [20, 0.3],
+        [40, 0.32],
+        [60, 0.34],
+        [80, 0.36],
+        [100, 0.38]
+      ]
+    },
+    {
+      name: 'MBitTree',
+      data: [
+        [0, 0.28],
+        [20, 0.31],
+        [40, 0.45],
+        [60, 0.55],
+        [80, 0.61],
+        [100, 0.65]
+      ]
+    }
   ],
-  '10k': [
-    { category: 'acl1', EffiMatch: 10.0, NeuTree: 6.5, NuevoMatch: 0.5 },
-    { category: 'acl2', EffiMatch: 7.0, NeuTree: 5.0, NuevoMatch: 0.5 },
-    { category: 'acl3', EffiMatch: 8.0, NeuTree: 3.5, NuevoMatch: 0.5 },
-    { category: 'acl4', EffiMatch: 8.5, NeuTree: 5.0, NuevoMatch: 1.0 },
-    { category: 'acl5', EffiMatch: 10.0, NeuTree: 7.5, NuevoMatch: 1.0 },
-    { category: 'fw1', EffiMatch: 6.5, NeuTree: 5.5, NuevoMatch: 1.0 },
-    { category: 'fw2', EffiMatch: 13.0, NeuTree: 8.5, NuevoMatch: 1.5 },
-    { category: 'fw3', EffiMatch: 6.5, NeuTree: 6.0, NuevoMatch: 0.5 },
-    { category: 'fw4', EffiMatch: 4.5, NeuTree: 3.5, NuevoMatch: 1.0 },
-    { category: 'fw5', EffiMatch: 7.5, NeuTree: 7.0, NuevoMatch: 1.5 },
-    { category: 'ipc1', EffiMatch: 8.0, NeuTree: 7.5, NuevoMatch: 2.5 },
-    { category: 'ipc2', EffiMatch: 10.5, NeuTree: 9.0, NuevoMatch: 1.5 }
+  fw: [
+    {
+      name: 'MBitTree w/ TransTuple',
+      data: [
+        [0, 0.32],
+        [20, 0.33],
+        [40, 0.35],
+        [60, 0.37],
+        [80, 0.39],
+        [100, 0.41]
+      ]
+    },
+    {
+      name: 'MBitTree',
+      data: [
+        [0, 0.32],
+        [20, 0.4],
+        [40, 0.58],
+        [60, 0.65],
+        [80, 0.78],
+        [100, 0.9]
+      ]
+    }
   ],
-  '100k': [
-    { category: 'acl1', EffiMatch: 7.0, NeuTree: 4.5, NuevoMatch: 0.5 },
-    { category: 'acl2', EffiMatch: 4.0, NeuTree: 3.0, NuevoMatch: 1.5 },
-    { category: 'acl3', EffiMatch: 5.0, NeuTree: 3.5, NuevoMatch: 1.5 },
-    { category: 'acl4', EffiMatch: 4.0, NeuTree: 3.5, NuevoMatch: 1.0 },
-    { category: 'acl5', EffiMatch: 6.0, NeuTree: 6.0, NuevoMatch: 0.5 },
-    { category: 'fw1', EffiMatch: 4.5, NeuTree: 4.0, NuevoMatch: 1.0 },
-    { category: 'fw2', EffiMatch: 10.0, NeuTree: 5.5, NuevoMatch: 1.5 },
-    { category: 'fw3', EffiMatch: 4.0, NeuTree: 4.0, NuevoMatch: 0.5 },
-    { category: 'fw4', EffiMatch: 3.0, NeuTree: 2.5, NuevoMatch: 1.5 },
-    { category: 'fw5', EffiMatch: 4.5, NeuTree: 4.5, NuevoMatch: 1.5 },
-    { category: 'ipc1', EffiMatch: 4.5, NeuTree: 4.5, NuevoMatch: 1.5 },
-    { category: 'ipc2', EffiMatch: 6.5, NeuTree: 6.5, NuevoMatch: 1.5 }
+  ipc: [
+    {
+      name: 'MBitTree w/ TransTuple',
+      data: [
+        [0, 0.52],
+        [20, 0.53],
+        [40, 0.54],
+        [60, 0.55],
+        [80, 0.56],
+        [100, 0.57]
+      ]
+    },
+    {
+      name: 'MBitTree',
+      data: [
+        [0, 0.52],
+        [20, 0.58],
+        [40, 0.72],
+        [60, 0.82],
+        [80, 0.9],
+        [100, 1.15]
+      ]
+    }
   ]
 }
 
@@ -101,17 +140,14 @@ function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
     for (const key in originalData) {
-      const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: number | string }
-        // ['EffiMatch', 'NeuTree', 'NuevoMatch'].forEach((algo) => {
-        ;['EffiMatch'].forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.9 + Math.random() * 0.2
-          newItem[algo as keyof typeof item] = parseFloat((originalValue * multiplier).toFixed(2))
-        })
-        return newItem
-      })
+      const categoryKey = key as keyof typeof originalData
+      liveData.value[categoryKey] = originalData[categoryKey].map((seriesItem) => ({
+        ...seriesItem,
+        data: seriesItem.data.map((point) => [
+          point[0],
+          parseFloat((point[1] * (0.95 + Math.random() * 0.1)).toFixed(3))
+        ])
+      }))
     }
   }, 1000)
 }
@@ -123,92 +159,118 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => {
-  if (!globalStore.isStarted) {
-    return []
+// --- 4. ECharts 配置项生成函数 ---
+
+function getChartOptions(isUpdate = false) {
+  const categoryKey = selectedCategory.value as keyof typeof liveData.value
+  const currentSeries = liveData.value[categoryKey] || []
+
+  // ✨ 2. 动态标注逻辑更新：确保使用正确的系列名称
+  const mbitTreeSeries = currentSeries.find((s: { name: string }) => s.name === 'MBitTree')
+  const transTupleSeries = currentSeries.find(
+    (s: { name: string }) => s.name === 'MBitTree w/ TransTuple'
+  )
+  let markPoints: any[] = []
+  if (mbitTreeSeries && transTupleSeries) {
+    markPoints = mbitTreeSeries.data
+      .map((point: number[], index: string | number) => {
+        const transTupleY = transTupleSeries.data[index][1]
+        const ratio = transTupleY > 1e-6 ? point[1] / transTupleY : 1.0
+        return { value: `${ratio.toFixed(1)}X`, coord: point }
+      })
+      .slice(1)
   }
-  return liveData.value[selectedSize.value]
-})
 
-const chartOptions = computed(() => {
-  const algorithms = ['EffiMatch', 'NeuTree', 'NuevoMatch']
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
-
-  const series = algorithms.map((algo) => {
-    let color, decalPattern
-    switch (algo) {
-      case 'EffiMatch':
-        color = '#73b96e'
-        decalPattern = {
-          symbol: 'rect',
-          rotation: Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
-        }
+  const seriesConfig = currentSeries.map((seriesItem: { name: any; data: any }) => {
+    let style = {}
+    // ✨ 3. 系列样式更新：匹配新图表的系列名称和样式
+    switch (seriesItem.name) {
+      case 'MBitTree w/ TransTuple':
+        style = { color: '#e62429', lineStyle: { type: 'solid' }, symbol: 'circle', symbolSize: 8 }
         break
-      case 'NeuTree':
-        color = '#f07c79'
-        decalPattern = { symbol: 'line', rotation: 0, color: 'rgba(0, 0, 0, 0.4)', symbolSize: 0.8 }
-        break
-      case 'NuevoMatch':
-        color = '#5b8ff9'
-        decalPattern = {
+      case 'MBitTree':
+        style = {
+          color: '#3366cc',
+          lineStyle: { type: 'dashed' },
           symbol: 'rect',
-          rotation: -Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
+          symbolSize: 8,
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: 8,
+            label: { position: 'top', color: '#000', fontSize: 14, fontWeight: 'bold' },
+            data: markPoints
+          }
         }
         break
     }
-
     return {
-      name: algo,
-      type: 'bar',
-      barGap: 0,
-      emphasis: { focus: 'series' },
-      data: currentChartData.value.map(
-        (item: { [x: string]: any }) => item[algo as keyof typeof item]
-      ),
-      itemStyle: { color, decal: decalPattern }
+      name: seriesItem.name,
+      type: 'line',
+      data: seriesItem.data,
+      showSymbol: true,
+      ...style
     }
   })
+
+  if (isUpdate) {
+    return { series: seriesConfig }
+  }
 
   return {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: { trigger: 'axis' },
     legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    grid: { top: '5%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: { type: 'category', data: categories },
+    grid: { top: '5%', left: '8%', right: '4%', bottom: '20%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      name: 'Compression Ratio',
+      nameLocation: 'middle',
+      nameGap: 30,
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: '{value}%' }
+    },
     yAxis: {
       type: 'value',
-      name: 'Mpps',
+      name: 'Latency (μs)',
       nameLocation: 'middle',
-      nameGap: 30
+      nameGap: 50,
+      min: 0,
+      // ✨ 4. Y轴范围调整
+      max: 1.4
     },
-    series: series
+    series: seriesConfig
   }
-})
+}
 
-watch(chartOptions, (newOptions, oldOptions) => {
-  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
-    myChart.setOption(newOptions, true)
+// --- 5. 监听器 ---
+
+watch(
+  [liveData, selectedCategory],
+  () => {
+    if (!myChart || !globalStore.isStarted) {
+      myChart?.setOption({ series: [] })
+      return
+    }
+    myChart.setOption(getChartOptions(true))
+  },
+  { deep: true }
+)
+
+watch(
+  () => globalStore.isStarted,
+  (isStarted) => {
+    if (myChart && isStarted) {
+      myChart.setOption(getChartOptions())
+    } else if (myChart && !isStarted) {
+      myChart.setOption({ series: [] })
+    }
   }
-})
+)
 </script>
 
 <style scoped>
-.controls-container {
-  margin: 0 10%;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.controls-container label {
-  min-width: 110px;
-  margin-right: 8px;
-  font-size: 14px;
-}
+/* 样式保持不变 */
 </style>

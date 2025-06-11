@@ -16,6 +16,7 @@ import HdcExp4 from '@/components/hdc-exp4.vue'
 import HdcExp2 from '@/components/hdc-exp2.vue'
 import EffimatchExp6 from '@/components/effimatch-exp6.vue'
 import HdcExp1 from '@/components/hdc-exp1.vue'
+import CreatePacketsType from '@/components/CreatePacketsType.vue'
 </script>
 
 <template>
@@ -25,7 +26,7 @@ import HdcExp1 from '@/components/hdc-exp1.vue'
         <el-row :gutter="20" style="margin-bottom: 20px">
           <el-col :span="24">
             <div class="graph-left-one">
-              <CreatePackets />
+              <CreatePacketsType />
             </div>
           </el-col>
         </el-row>

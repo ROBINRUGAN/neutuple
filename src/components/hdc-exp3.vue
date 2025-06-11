@@ -1,23 +1,11 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">聚合吞吐量</div>
-
-  <div class="form-container">
-    <label for="workers-select">选择工人数量: </label>
-    <el-select
-      id="workers-select"
-      v-model="selectedWorkers"
-      :style="{ opacity: globalStore.isStarted ? 1 : 0 }"
-    >
-      <el-option value="2" label="Two Workers"></el-option>
-      <el-option value="3" label="Three Workers"></el-option>
-      <el-option value="4" label="Four Workers"></el-option>
-    </el-select>
-  </div>
-
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">内存消耗</div>
   <div
     ref="chartContainer"
-    style="width: 100%; height: 450px"
-    :style="{ opacity: globalStore.isStarted ? 1 : 0 }"
+    style="width: 100%; height: 300px"
+    :style="{
+      opacity: globalStore.isStarted ? 1 : 0
+    }"
   ></div>
 </template>
 
@@ -26,17 +14,23 @@ import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
 
-// --- 1. 响应式状态定义 ---
-const globalStore = useGlobalStore()
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
+const globalStore = useGlobalStore()
+
+const selectedSize = ref<string>(globalStore.ruleScale)
+
 let intervalId: number | null = null
 
-const selectedWorkers = ref<'2' | '3' | '4'>('2')
-
-// --- 2. 生命周期和图表实例管理 ---
-
 onMounted(() => {
+  // The user prompt indicates this is for exp4, but the old code has exp3.
+  // I will assume the experiment name should also be updated.
+  globalStore.registerRefreshFunction('neuexp3', (size: string) => {
+    selectedSize.value = size
+  })
+  globalStore.registerClearFunction('neuexp3', () => {
+    selectedSize.value = 'null'
+  })
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
     myChart.setOption(chartOptions.value)
@@ -58,104 +52,22 @@ watchEffect(() => {
   })
 })
 
-// --- 3. 图表数据 ---
-
+// Data extracted from the provided image
 const originalData = {
-  '2': [
-    {
-      name: 'DHC(One Gpu)',
-      data: [
-        [0, 380],
-        [25, 250],
-        [50, 150],
-        [75, 120],
-        [100, 110]
-      ]
-    },
-    {
-      name: 'DHC(Two Gpus)',
-      data: [
-        [0, 370],
-        [25, 240],
-        [50, 158],
-        [75, 123],
-        [100, 112]
-      ]
-    },
-    {
-      name: 'NCCL',
-      data: [
-        [0, 110],
-        [25, 115],
-        [50, 120],
-        [75, 115],
-        [100, 110]
-      ]
-    }
+  '1k': [
+    { category: 'ACL 1k', NeuTree: 17, NuevoMatch: 19, TabTree: 44, KickTree: 42, PSTSS: 47, CutSplit: 26 },
+    { category: 'FW 1k', NeuTree: 16, NuevoMatch: 22, TabTree: 45, KickTree: 42, PSTSS: 47, CutSplit: 21 },
+    { category: 'IPC 1k', NeuTree: 13, NuevoMatch: 25, TabTree: 47, KickTree: 43, PSTSS: 47, CutSplit: 18 }
   ],
-  '3': [
-    {
-      name: 'DHC(One Gpu)',
-      data: [
-        [0, 350],
-        [25, 230],
-        [50, 210],
-        [75, 120],
-        [100, 100]
-      ]
-    },
-    {
-      name: 'DHC(Two Gpus)',
-      data: [
-        [0, 340],
-        [25, 220],
-        [50, 190],
-        [75, 110],
-        [100, 90]
-      ]
-    },
-    {
-      name: 'NCCL',
-      data: [
-        [0, 115],
-        [25, 115],
-        [50, 118],
-        [75, 118],
-        [100, 110]
-      ]
-    }
+  '10k': [
+    { category: 'ACL 10k', NeuTree: 14, NuevoMatch: 25, TabTree: 40, KickTree: 34, PSTSS: 47, CutSplit: 29 },
+    { category: 'FW 10k', NeuTree: 12, NuevoMatch: 10, TabTree: 24, KickTree: 44, PSTSS: 47, CutSplit: 20 },
+    { category: 'IPC 10k', NeuTree: 8, NuevoMatch: 6, TabTree: 39, KickTree: 36, PSTSS: 47, CutSplit: 19 }
   ],
-  '4': [
-    {
-      name: 'DHC(One Gpu)',
-      data: [
-        [0, 350],
-        [25, 230],
-        [50, 210],
-        [75, 100],
-        [100, 90]
-      ]
-    },
-    {
-      name: 'DHC(Two Gpus)',
-      data: [
-        [0, 320],
-        [25, 210],
-        [50, 180],
-        [75, 90],
-        [100, 70]
-      ]
-    },
-    {
-      name: 'NCCL',
-      data: [
-        [0, 100],
-        [25, 100],
-        [50, 100],
-        [75, 100],
-        [100, 100]
-      ]
-    }
+  '100k': [
+    { category: 'ACL 100k', NeuTree: 8, NuevoMatch: 5, TabTree: 24, KickTree: 28, PSTSS: 47, CutSplit: 20 },
+    { category: 'FW 100k', NeuTree: 15, NuevoMatch: 4, TabTree: 25, KickTree: 28, PSTSS: 47, CutSplit: 19 },
+    { category: 'IPC 100k', NeuTree: 11, NuevoMatch: 2, TabTree: 23, KickTree: 27, PSTSS: 47, CutSplit: 18 }
   ]
 }
 
@@ -165,16 +77,20 @@ function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
     for (const key in originalData) {
-      const workerKey = key as keyof typeof originalData
-      liveData.value[workerKey] = originalData[workerKey].map((seriesItem) => {
-        const newSeriesData = seriesItem.data.map((point) => {
-          const x = point[0]
-          const originalY = point[1]
-          const multiplier = 0.9 + Math.random() * 0.2
-          const newY = originalY * multiplier
-          return [x, parseFloat(newY.toFixed(2))]
+      const sizeKey = key as keyof typeof originalData
+      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
+        const newItem = { ...item } as { [key: string]: number | string }
+        ;['NeuTree', 'NuevoMatch', 'TabTree', 'KickTree', 'PSTSS', 'CutSplit'].forEach((algo) => {
+          const originalValue = item[algo as keyof typeof item] as number
+          // Keep PSTSS stable as it appears to be a fixed upper bound in the chart
+          if (algo === 'PSTSS') {
+            newItem[algo as keyof typeof item] = originalValue
+          } else {
+            const multiplier = 0.95 + Math.random() * 0.1 // Apply a small fluctuation
+            newItem[algo as keyof typeof item] = parseFloat((originalValue * multiplier).toFixed(2))
+          }
         })
-        return { ...seriesItem, data: newSeriesData }
+        return newItem
       })
     }
   }, 1000)
@@ -187,33 +103,80 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => liveData.value[selectedWorkers.value])
-
-// --- 4. ECharts 配置项 ---
+const currentChartData = computed(() => {
+  if (!globalStore.isStarted || !selectedSize.value || !liveData.value[selectedSize.value]) {
+    return []
+  }
+  return liveData.value[selectedSize.value]
+})
 
 const chartOptions = computed(() => {
-  const series = currentChartData.value.map((seriesItem: { name: any; data: any }) => {
-    let style = {}
-    // ✨ 根据系列名称设置不同样式
-    switch (seriesItem.name) {
-      case 'DHC(One Gpu)':
-        style = { color: '#e62429', lineStyle: { type: 'solid' }, symbol: 'circle' }
+  const algorithms = ['NeuTree', 'NuevoMatch', 'TabTree', 'KickTree', 'PSTSS', 'CutSplit']
+  const categories = currentChartData.value.map((item: { category: string }) => item.category)
+
+  const series = algorithms.map((algo) => {
+    let color: string
+    let decalPattern: echarts.PatternObject | undefined
+
+    switch (algo) {
+      case 'NeuTree':
+        color = '#e53935' // Solid Red
+        decalPattern = undefined
         break
-      case 'DHC(Two Gpus)':
-        style = { color: '#3366cc', lineStyle: { type: 'dashed' }, symbol: 'square' }
+      case 'NuevoMatch':
+        color = '#f4a9a8' // Light Red
+        decalPattern = {
+          symbol: 'line',
+          rotation: Math.PI / 4,
+          color: 'rgba(0, 0, 0, 0.3)'
+        }
         break
-      case 'NCCL':
-        style = { color: '#4caf50', lineStyle: { type: 'dashed' }, symbol: 'square' }
+      case 'TabTree':
+        color = '#00897b' // Solid Teal
+        decalPattern = undefined
+        break
+      case 'KickTree':
+        color = '#1e88e5' // Dark Blue
+        decalPattern = {
+          symbol: 'line',
+          rotation: 0, // Horizontal lines
+          color: 'rgba(0, 0, 0, 0.4)'
+        }
+        break
+      case 'PSTSS':
+        color = '#4dd0e1' // Light Cyan
+        decalPattern = {
+          symbol: 'path://M0,0 L1,1 M1,0 L0,1', // 'X' shape
+          color: 'rgba(0, 0, 0, 0.4)',
+          symbolSize: 0.6
+        }
+        break
+      case 'CutSplit':
+        color = '#2dbba7' // Green/Teal
+        decalPattern = {
+          symbol: 'line',
+          rotation: -Math.PI / 4,
+          color: 'rgba(0, 0, 0, 0.4)'
+        }
+        break
+      default:
+        color = '#ccc'
+        decalPattern = undefined
         break
     }
 
     return {
-      name: seriesItem.name,
-      type: 'line',
-      data: seriesItem.data,
-      symbolSize: 8,
-      showSymbol: true, // 显示标记点
-      ...style
+      name: algo,
+      type: 'bar',
+      barGap: 0,
+      emphasis: { focus: 'series' },
+      data: currentChartData.value.map(
+        (item: { [x: string]: any }) => item[algo as keyof typeof item]
+      ),
+      itemStyle: {
+        color: color,
+        decal: decalPattern
+      }
     }
   })
 
@@ -223,60 +186,44 @@ const chartOptions = computed(() => {
     animationDurationUpdate: 500,
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    grid: { top: '5%', left: '15%', right: '5%', bottom: '20%', containLabel: false },
+    grid: { top: '5%', left: '8%', right: '4%', bottom: '20%', containLabel: true },
     xAxis: {
-      type: 'value',
-      name: 'Compression Ratio',
-      nameLocation: 'middle',
-      nameGap: 30,
-      min: 0,
-      max: 100,
-      axisLabel: { formatter: '{value}%' }
+      type: 'category',
+      data: categories,
+      axisLabel: {
+        interval: 0 // Show all labels
+      }
     },
     yAxis: {
       type: 'value',
-      name: 'Aggregation Thr. (Gps)',
+      name: 'Byte / Rule',
       nameLocation: 'middle',
-      nameGap: 50,
-      min: 0,
-      max: 400
+      nameGap: 45,
+      max: 50,
+      interval: 15 // Set Y-axis ticks to match the image grid
     },
     series: series
   }
 })
 
-watch(chartOptions, (newOptions) => {
-  if (myChart) {
+watch(chartOptions, (newOptions, oldOptions) => {
+  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
     myChart.setOption(newOptions, true)
   }
 })
 </script>
 
 <style scoped>
-.form-container {
-  font-size: 14px;
+.controls-container {
+  margin: 0 10%;
+  margin-bottom: 15px;
   display: flex;
-  flex-direction: row;
-  width: 80%;
+  align-items: center;
   justify-content: center;
-  margin: auto;
 }
-
-label {
-  margin-top: 5px;
-  min-width: 90px;
-  margin-right: 8px; /* 标签和选择框之间的间距 */
+.controls-container label {
+  min-width: 110px;
+  margin-right: 8px;
   font-size: 14px;
-  color: #606266;
-}
-
-/* 确保 el-select 和 el-button 宽度充满其容器 */
-select {
-  width: 100%;
-  display: flex;
-}
-select {
-  display: flex;
-  width: 20px;
 }
 </style>

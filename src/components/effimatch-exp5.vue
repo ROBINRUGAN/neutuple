@@ -1,5 +1,8 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">规则访问效率</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">
+    处理时间对比 (Processing Time)
+  </div>
+
   <div
     ref="chartContainer"
     style="width: 100%; height: 330px"
@@ -10,28 +13,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
+
+// --- 1. 响应式状态定义 ---
 
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
 const globalStore = useGlobalStore()
 
-const selectedSize = ref<string>(globalStore.ruleScale)
-
+const selectedCategory = ref<string>(globalStore.ruleCategory)
 let intervalId: number | null = null
 
+// --- 2. 生命周期和图表实例管理 ---
+
 onMounted(() => {
-  globalStore.registerRefreshFunction('exp5', (size: string) => {
-    selectedSize.value = size
+  // ✨ 使用新的key来注册函数，防止与上一个图表冲突
+  globalStore.registerRefreshFunction('procexp', () => {
+    selectedCategory.value = globalStore.ruleCategory
   })
-  globalStore.registerClearFunction('exp5', () => {
-    selectedSize.value = 'null'
+  globalStore.registerClearFunction('procexp', () => {
+    selectedCategory.value = 'null'
   })
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    myChart.setOption(chartOptions.value)
+    myChart.setOption(getChartOptions())
     startDataFluctuation()
   }
 })
@@ -44,55 +51,79 @@ onUnmounted(() => {
   stopDataFluctuation()
 })
 
-watchEffect(() => {
-  window.addEventListener('resize', () => {
-    myChart?.resize()
-  })
-})
+// --- 3. 图表数据 ---
 
+// ✨ 1. 数据重构：根据新的论文图 (Fig. 12) 更新数据结构和数值
 const originalData = {
-  '1k': [
-    { category: 'acl1', EffiMatch: 1.3, NeuTree: 1.6, NuevoMatch: 1.3 },
-    { category: 'acl2', EffiMatch: 1.4, NeuTree: 1.8, NuevoMatch: 1.5 },
-    { category: 'acl3', EffiMatch: 1.6, NeuTree: 2.1, NuevoMatch: 1.7 },
-    { category: 'acl4', EffiMatch: 1.5, NeuTree: 2.0, NuevoMatch: 1.6 },
-    { category: 'acl5', EffiMatch: 1.4, NeuTree: 1.9, NuevoMatch: 1.6 },
-    { category: 'fw1', EffiMatch: 1.3, NeuTree: 1.8, NuevoMatch: 1.3 },
-    { category: 'fw2', EffiMatch: 1.1, NeuTree: 1.4, NuevoMatch: 1.1 },
-    { category: 'fw3', EffiMatch: 1.2, NeuTree: 1.6, NuevoMatch: 1.2 },
-    { category: 'fw4', EffiMatch: 1.7, NeuTree: 2.0, NuevoMatch: 1.6 },
-    { category: 'fw5', EffiMatch: 1.5, NeuTree: 1.8, NuevoMatch: 1.5 },
-    { category: 'ipc1', EffiMatch: 1.3, NeuTree: 1.6, NuevoMatch: 1.3 },
-    { category: 'ipc2', EffiMatch: 1.1, NeuTree: 1.4, NuevoMatch: 1.2 }
-  ],
-  '10k': [
-    { category: 'acl1', EffiMatch: 1.5, NeuTree: 1.8, NuevoMatch: 1.4 },
-    { category: 'acl2', EffiMatch: 1.7, NeuTree: 2.1, NuevoMatch: 1.6 },
-    { category: 'acl3', EffiMatch: 2.0, NeuTree: 2.4, NuevoMatch: 1.9 },
-    { category: 'acl4', EffiMatch: 1.9, NeuTree: 2.2, NuevoMatch: 1.7 },
-    { category: 'acl5', EffiMatch: 1.7, NeuTree: 2.0, NuevoMatch: 1.6 },
-    { category: 'fw1', EffiMatch: 1.5, NeuTree: 2.0, NuevoMatch: 1.4 },
-    { category: 'fw2', EffiMatch: 1.3, NeuTree: 1.7, NuevoMatch: 1.2 },
-    { category: 'fw3', EffiMatch: 1.5, NeuTree: 1.9, NuevoMatch: 1.3 },
-    { category: 'fw4', EffiMatch: 2.1, NeuTree: 2.5, NuevoMatch: 2.0 },
-    { category: 'fw5', EffiMatch: 1.9, NeuTree: 2.1, NuevoMatch: 1.7 },
-    { category: 'ipc1', EffiMatch: 1.8, NeuTree: 2.0, NuevoMatch: 1.6 },
-    { category: 'ipc2', EffiMatch: 1.5, NeuTree: 1.8, NuevoMatch: 1.4 }
-  ],
-  '100k': [
-    { category: 'acl1', EffiMatch: 1.7, NeuTree: 1.9, NuevoMatch: 1.6 },
-    { category: 'acl2', EffiMatch: 1.9, NeuTree: 2.2, NuevoMatch: 1.8 },
-    { category: 'acl3', EffiMatch: 2.1, NeuTree: 2.4, NuevoMatch: 2.0 },
-    { category: 'acl4', EffiMatch: 2.0, NeuTree: 2.2, NuevoMatch: 1.8 },
-    { category: 'acl5', EffiMatch: 1.9, NeuTree: 2.1, NuevoMatch: 1.7 },
-    { category: 'fw1', EffiMatch: 1.7, NeuTree: 2.1, NuevoMatch: 1.6 },
-    { category: 'fw2', EffiMatch: 1.5, NeuTree: 1.9, NuevoMatch: 1.4 },
-    { category: 'fw3', EffiMatch: 1.6, NeuTree: 2.0, NuevoMatch: 1.5 },
-    { category: 'fw4', EffiMatch: 2.2, NeuTree: 2.6, NuevoMatch: 2.1 },
-    { category: 'fw5', EffiMatch: 2.0, NeuTree: 2.3, NuevoMatch: 1.9 },
-    { category: 'ipc1', EffiMatch: 2.0, NeuTree: 2.2, NuevoMatch: 1.8 },
-    { category: 'ipc2', EffiMatch: 1.8, NeuTree: 2.0, NuevoMatch: 1.6 }
-  ]
+  acl: {
+    CutTSS: [
+      { r: 20, rec: 850, tra: 1.2 },
+      { r: 40, rec: 850, tra: 2.5 },
+      { r: 60, rec: 850, tra: 3.0 },
+      { r: 80, rec: 850, tra: 3.5 },
+      { r: 100, rec: 850, tra: 4.0 }
+    ],
+    TabTree: [
+      { r: 20, rec: 1000, tra: 0.4 },
+      { r: 40, rec: 1000, tra: 0.8 },
+      { r: 60, rec: 1000, tra: 1.2 },
+      { r: 80, rec: 1000, tra: 1.8 },
+      { r: 100, rec: 1000, tra: 2.5 }
+    ],
+    MBitTree: [
+      { r: 20, rec: 800, tra: 0.4 },
+      { r: 40, rec: 800, tra: 2.0 },
+      { r: 60, rec: 800, tra: 3.0 },
+      { r: 80, rec: 800, tra: 4.0 },
+      { r: 100, rec: 800, tra: 4.5 }
+    ]
+  },
+  fw: {
+    CutTSS: [
+      { r: 20, rec: 900, tra: 1.0 },
+      { r: 40, rec: 900, tra: 2.0 },
+      { r: 60, rec: 900, tra: 2.5 },
+      { r: 80, rec: 900, tra: 3.0 },
+      { r: 100, rec: 900, tra: 3.8 }
+    ],
+    TabTree: [
+      { r: 20, rec: 1000, tra: 0.3 },
+      { r: 40, rec: 1000, tra: 0.7 },
+      { r: 60, rec: 1000, tra: 1.1 },
+      { r: 80, rec: 1000, tra: 1.5 },
+      { r: 100, rec: 1000, tra: 2.3 }
+    ],
+    MBitTree: [
+      { r: 20, rec: 900, tra: 0.3 },
+      { r: 40, rec: 900, tra: 1.0 },
+      { r: 60, rec: 900, tra: 1.5 },
+      { r: 80, rec: 900, tra: 2.0 },
+      { r: 100, rec: 900, tra: 2.5 }
+    ]
+  },
+  ipc: {
+    CutTSS: [
+      { r: 20, rec: 950, tra: 1.5 },
+      { r: 40, rec: 950, tra: 2.2 },
+      { r: 60, rec: 950, tra: 3.5 },
+      { r: 80, rec: 950, tra: 4.5 },
+      { r: 100, rec: 950, tra: 6.0 }
+    ],
+    TabTree: [
+      { r: 20, rec: 1000, tra: 0.5 },
+      { r: 40, rec: 1000, tra: 0.9 },
+      { r: 60, rec: 1000, tra: 1.4 },
+      { r: 80, rec: 1000, tra: 1.9 },
+      { r: 100, rec: 1000, tra: 2.8 }
+    ],
+    MBitTree: [
+      { r: 20, rec: 950, tra: 0.4 },
+      { r: 40, rec: 950, tra: 1.2 },
+      { r: 60, rec: 950, tra: 1.8 },
+      { r: 80, rec: 950, tra: 2.3 },
+      { r: 100, rec: 950, tra: 3.0 }
+    ]
+  }
 }
 
 const liveData = ref(JSON.parse(JSON.stringify(originalData)))
@@ -100,18 +131,19 @@ const liveData = ref(JSON.parse(JSON.stringify(originalData)))
 function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
-    for (const key in originalData) {
-      const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: number | string }
-        // ['EffiMatch', 'NeuTree', 'NuevoMatch'].forEach((algo) => {
-        ;['EffiMatch'].forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.9 + Math.random() * 0.2
-          newItem[algo as keyof typeof item] = parseFloat((originalValue * multiplier).toFixed(2))
-        })
-        return newItem
-      })
+    for (const catKey in originalData) {
+      for (const methodKey in originalData[catKey as keyof typeof originalData]) {
+        liveData.value[catKey as keyof typeof originalData][
+          methodKey as keyof (typeof originalData)['acl']
+        ] = originalData[catKey as keyof typeof originalData][
+          methodKey as keyof (typeof originalData)['acl']
+          // ✨ 2. 更新随机数据生成逻辑的键名
+        ].map((item) => ({
+          ...item,
+          rec: parseFloat((item.rec * (0.98 + Math.random() * 0.04)).toFixed(2)),
+          tra: parseFloat((item.tra * (0.95 + Math.random() * 0.1)).toFixed(2))
+        }))
+      }
     }
   }, 1000)
 }
@@ -123,92 +155,136 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => {
-  if (!globalStore.isStarted) {
-    return []
+// --- 4. ECharts 配置项生成函数 ---
+
+function getChartOptions(isUpdate = false) {
+  const categoryKey = selectedCategory.value as keyof typeof liveData.value
+  const dataForCategory = liveData.value[categoryKey]
+
+  // ✨ 3. 更新系列名称和数据键名
+  const seriesNames = ['Reconstruction', 'TransTuple']
+  const dataKeys = ['rec', 'tra']
+
+  const xAxisData: string[] = []
+  const seriesData: number[][] = [[], []] // 现在只有2个系列
+
+  if (dataForCategory) {
+    const methods = ['CutTSS', 'TabTree', 'MBitTree']
+    methods.forEach((method) => {
+      if (xAxisData.length > 0) {
+        xAxisData.push('')
+        seriesData.forEach((s) => s.push(NaN))
+      }
+
+      const points = dataForCategory[method as keyof typeof dataForCategory]
+      points.forEach((item: { r: any }) => {
+        xAxisData.push(`${item.r}%`)
+      })
+
+      // 生成系列数据
+      points.forEach((item: { rec: number; tra: number }) => {
+        seriesData[0].push(item.rec)
+        seriesData[1].push(item.tra)
+      })
+    })
   }
-  return liveData.value[selectedSize.value]
-})
 
-const chartOptions = computed(() => {
-  const algorithms = ['EffiMatch', 'NeuTree', 'NuevoMatch']
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
-
-  const series = algorithms.map((algo) => {
-    let color, decalPattern
-    switch (algo) {
-      case 'EffiMatch':
-        color = '#73b96e'
-        decalPattern = {
-          symbol: 'rect',
-          rotation: Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
+  // ✨ 4. 更新系列配置，适配新的图例和样式
+  const seriesConfig = seriesNames.map((name, index) => {
+    let style = {}
+    switch (name) {
+      case 'Reconstruction':
+        style = {
+          itemStyle: {
+            color: '#5470c6', // 保持紫色
+            // 添加纹理，模拟原图样式
+            decal: { symbol: 'rect', rotation: Math.PI / 4, color: 'rgba(255,255,255,0.4)' }
+          }
         }
         break
-      case 'NeuTree':
-        color = '#f07c79'
-        decalPattern = { symbol: 'line', rotation: 0, color: 'rgba(0, 0, 0, 0.4)', symbolSize: 0.8 }
-        break
-      case 'NuevoMatch':
-        color = '#5b8ff9'
-        decalPattern = {
-          symbol: 'rect',
-          rotation: -Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
+      case 'TransTuple':
+        style = {
+          itemStyle: {
+            color: '#91cc75' // 使用绿色
+          }
         }
         break
     }
-
-    return {
-      name: algo,
-      type: 'bar',
-      barGap: 0,
-      emphasis: { focus: 'series' },
-      data: currentChartData.value.map(
-        (item: { [x: string]: any }) => item[algo as keyof typeof item]
-      ),
-      itemStyle: { color, decal: decalPattern }
-    }
+    // 关键：不再使用 barGap: '-100%'，让柱子并列显示
+    return { name, type: 'bar', data: seriesData[index], ...style }
   })
+
+  if (isUpdate) {
+    return {
+      xAxis: [{ data: xAxisData }],
+      series: seriesConfig
+    }
+  }
 
   return {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    grid: { top: '5%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: { type: 'category', data: categories },
-    yAxis: {
-      type: 'value',
-      name: 'Rule Acc. / Packet',
-      nameLocation: 'middle',
-      nameGap: 30
-    },
-    series: series
-  }
-})
+    legend: { data: seriesNames, bottom: 0 },
+    grid: { top: '8%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
 
-watch(chartOptions, (newOptions, oldOptions) => {
-  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
-    myChart.setOption(newOptions, true)
+    xAxis: [
+      {
+        type: 'category',
+        data: xAxisData,
+        axisLabel: { interval: 0, rotate: 30 },
+        axisTick: { alignWithLabel: true },
+        position: 'bottom'
+      },
+      {
+        type: 'category',
+        data: ['CutTSS', '', 'TabTree', '', 'MBitTree'],
+        position: 'bottom',
+        offset: 45, // 增加偏移，为旋转的label留出空间
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#333', fontSize: 14, fontWeight: 'bold' }
+      }
+    ],
+    // ✨ 5. 修改 Y 轴为对数轴 (log)
+    yAxis: {
+      type: 'log',
+      name: 'Processing Time (ms)',
+      nameLocation: 'middle',
+      nameGap: 50, // 适当增加间距以容纳更宽的对数标签
+      logBase: 10 // 明确指定对数底为10
+    },
+    series: seriesConfig
   }
-})
+}
+
+// --- 5. 监听器 ---
+
+watch(
+  [liveData, selectedCategory],
+  () => {
+    if (!myChart || !globalStore.isStarted) {
+      myChart?.setOption({ series: [] })
+      return
+    }
+    myChart.setOption(getChartOptions(true))
+  },
+  { deep: true }
+)
+
+watch(
+  () => globalStore.isStarted,
+  (isStarted) => {
+    if (myChart && isStarted) {
+      myChart.setOption(getChartOptions())
+    } else if (myChart && !isStarted) {
+      myChart.setOption({ series: [] })
+    }
+  }
+)
 </script>
 
 <style scoped>
-.controls-container {
-  margin: 0 10%;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.controls-container label {
-  min-width: 110px;
-  margin-right: 8px;
-  font-size: 14px;
-}
+/* 样式保持不变 */
 </style>

@@ -1,8 +1,8 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">内存使用情况</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">构造时间</div>
   <div
     ref="chartContainer"
-    style="width: 100%; height: 300px"
+    style="width: 100%; height: 400px"
     :style="{
       opacity: globalStore.isStarted ? 1 : 0
     }"
@@ -18,15 +18,17 @@ const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
 const globalStore = useGlobalStore()
 
+// This ref will be updated by the globalStore callback
 const selectedSize = ref<string>(globalStore.ruleScale)
 
 let intervalId: number | null = null
 
 onMounted(() => {
-  globalStore.registerRefreshFunction('exp4', (size: string) => {
+  // The 'exp5' here is just a key for the store, can be different from the figure number
+  globalStore.registerRefreshFunction('neuexp4', (size: string) => {
     selectedSize.value = size
   })
-  globalStore.registerClearFunction('exp4', () => {
+  globalStore.registerClearFunction('neuexp4', () => {
     selectedSize.value = 'null'
   })
   if (chartContainer.value) {
@@ -50,14 +52,23 @@ watchEffect(() => {
   })
 })
 
+// Data extracted from the provided image for all three subplots
 const originalData = {
-  '1k': [
-    { category: 'NCF', withoutIndexSharing: 4, indexSharing: 1.6 },
-    { category: 'LSTM', withoutIndexSharing: 10, indexSharing: 2.4 },
-    { category: 'VGG16', withoutIndexSharing: 56, indexSharing: 32.0 },
-    { category: 'VGG19', withoutIndexSharing: 64, indexSharing: 32.0 },
-    { category: 'BERT-base', withoutIndexSharing: 154, indexSharing: 32.0 }
-  ]
+  '1k': {
+    categories: ['acl1', 'acl2', 'acl3', 'acl4', 'acl5', 'fw1', 'fw2', 'fw3', 'fw4', 'fw5', 'ipc1', 'ipc2'],
+    neuTree: [0.004, 0.005, 0.005, 0.006, 0.004, 0.008, 0.015, 0.01, 0.004, 0.005, 0.015, 0.005],
+    nuevoMatch: [80, 90, 80, 85, 70, 20, 50, 40, 40, 55, 80, 150]
+  },
+  '10k': {
+    categories: ['acl1', 'acl2', 'acl3', 'acl4', 'acl5', 'fw1', 'fw2', 'fw3', 'fw4', 'fw5', 'ipc1', 'ipc2'],
+    neuTree: [0.2, 0.3, 0.2, 0.2, 0.05, 0.2, 0.25, 0.2, 0.15, 0.1, 0.2, 0.25],
+    nuevoMatch: [90, 110, 100, 110, 120, 100, 110, 100, 90, 120, 180, 280]
+  },
+  '100k': {
+    categories: ['acl1', 'acl2', 'acl3', 'acl4', 'acl5', 'fw1', 'fw2', 'fw3', 'fw4', 'fw5', 'ipc1', 'ipc2'],
+    neuTree: [25, 30, 28, 35, 25, 8, 12, 4, 5, 3, 20, 15],
+    nuevoMatch: [350, 400, 1100, 800, 700, 900, 1000, 800, 800, 750, 800, 700]
+  }
 }
 
 const liveData = ref(JSON.parse(JSON.stringify(originalData)))
@@ -67,15 +78,15 @@ function startDataFluctuation() {
   intervalId = window.setInterval(() => {
     for (const key in originalData) {
       const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: number | string }
-        // Updated the key to fluctuate to match new data structure
-        ;['withoutIndexSharing'].forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.9 + Math.random() * 0.2
-          newItem[algo as keyof typeof item] = parseFloat((originalValue * multiplier).toFixed(2))
+      const originalDataset = originalData[sizeKey]
+      const liveDataset = liveData.value[sizeKey]
+
+      ;['neuTree', 'nuevoMatch'].forEach((algoKey) => {
+        const dataKey = algoKey as 'neuTree' | 'nuevoMatch'
+        liveDataset[dataKey] = originalDataset[dataKey].map((val) => {
+          const multiplier = 0.98 + Math.random() * 0.04 // Smaller fluctuation
+          return parseFloat((val * multiplier).toFixed(3))
         })
-        return newItem
       })
     }
   }, 1000)
@@ -89,69 +100,74 @@ function stopDataFluctuation() {
 }
 
 const currentChartData = computed(() => {
-  if (!globalStore.isStarted || !liveData.value['1k']) {
-    return []
+  const scale = selectedSize.value as keyof typeof liveData.value
+  if (!globalStore.isStarted || !scale || !liveData.value[scale]) {
+    return { categories: [], neuTree: [], nuevoMatch: [] }
   }
-  return liveData.value['1k']
+  return liveData.value[scale]
 })
 
 const chartOptions = computed(() => {
-  // Updated algorithm names and data keys
-  const algorithms = ['Without Index Sharing', 'Index Sharing']
-  const dataKeys = ['withoutIndexSharing', 'indexSharing']
-  const colors = ['#9d6ac2', '#a9c0e2'] // Purple and Light Blue from the image
-
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
-
-  const series = algorithms.map((algo, index) => {
-    const dataKey = dataKeys[index]
-    const color = colors[index]
-
-    return {
-      name: algo,
-      type: 'bar',
-      barGap: '0%', // Bars for the same category are next to each other
-      emphasis: { focus: 'series' },
-      data: currentChartData.value.map(
-        (item: { [x: string]: any }) => item[dataKey as keyof typeof item]
-      ),
-      // Updated itemStyle to use solid colors and remove decal
-      itemStyle: { color },
-      // Adding data labels on top of the bars
-      label: {
-        show: true,
-        position: 'top',
-        formatter: '{c}',
-        color: '#333',
-        fontSize: 10
-      }
-    }
-  })
-
   return {
     animation: true,
-    animationDuration: 500,
     animationDurationUpdate: 500,
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { bottom: 0, textStyle: { fontSize: 12 } },
-    grid: { top: '5%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: { type: 'category', data: categories },
-    yAxis: {
-      type: 'value',
-      name: 'Memory Usage (MB)', // Updated Y-axis title
-      nameLocation: 'middle',
-      nameGap: 40,
-      max: 180 // Adjust max value to give space for the highest bar's label
+    legend: {
+      data: ['NeuTree', 'NuevoMatch'],
+      bottom: 0, // Position legend at the top
+      textStyle: { fontSize: 14 }
     },
-    series: series
+    grid: { top: '3%', left: '3%', right: '4%', bottom: '7%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: currentChartData.value.categories
+    },
+    yAxis: {
+      type: 'log', // Use logarithmic scale
+      name: 'Constr. Time (s)',
+      nameLocation: 'middle',
+      nameGap: 55,
+      min: 0.001,
+      max: 2000 // Set a max value to accommodate all scales
+    },
+    series: [
+      {
+        name: 'NeuTree',
+        type: 'bar',
+        barGap: '0%', // Group bars together
+        emphasis: { focus: 'series' },
+        data: currentChartData.value.neuTree,
+        itemStyle: {
+          color: '#86d5d5' // Light teal color from image
+        }
+      },
+      {
+        name: 'NuevoMatch',
+        type: 'bar',
+        barGap: '0%',
+        emphasis: { focus: 'series' },
+        data: currentChartData.value.nuevoMatch,
+        itemStyle: {
+          color: '#337ab7', // Darker blue color from image
+          // Add decal for the hatched pattern
+          decal: {
+            symbol: 'path://M 0,10 L 10,0 M -1,1 L 1,-1 M 9,11 L 11,9',
+            symbolSize: 0.8,
+            color: 'rgba(255, 255, 255, 0.6)',
+            dashArrayX: [1, 0],
+            dashArrayY: [2, 5]
+          }
+        }
+      }
+    ]
   }
 })
 
 watch(
   () => currentChartData.value,
   (newData) => {
-    if (myChart && newData.length > 0) {
-      myChart.setOption(chartOptions.value, true)
+    if (myChart && newData.categories.length > 0) {
+      myChart.setOption(chartOptions.value, false) // Use false for non-merging update to handle category changes
     }
   },
   { deep: true }

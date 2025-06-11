@@ -1,45 +1,45 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">LPC方法构造时间</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">分类延迟分析 (TabTree)</div>
 
-  <!-- <div class="controls-container">
-    <label for="rules-select">选择规则集规模: </label>
-
-    <el-select id="rules-select" v-model="selectedSize">
-      <el-option value="1k" label="1k rules"></el-option>
-      <el-option value="10k" label="10k rules"></el-option>
-      <el-option value="100k" label="100k rules"></el-option>
-    </el-select>
-  </div> -->
   <div
     ref="chartContainer"
-    style="width: 100%; height: 220px"
-    :style="{ opacity: globalStore.isStarted ? 1 : 0 }"
+    style="width: 100%; height: 240px"
+    :style="{
+      opacity: globalStore.isStarted ? 1 : 0
+    }"
   ></div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
 
+// --- 1. 响应式状态定义 ---
+
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
-
 const globalStore = useGlobalStore()
-const selectedSize = ref<string>(globalStore.ruleScale)
 
+// ✨ 核心修正 1：添加本地状态，由全局回调驱动
+const selectedCategory = ref<string>(globalStore.ruleCategory)
 let intervalId: number | null = null
 
+// --- 2. 生命周期和图表实例管理 ---
+
 onMounted(() => {
-  globalStore.registerRefreshFunction('exp1', (size: string) => {
-    selectedSize.value = size
+  // ✨ 核心修正 2：注册回调函数以响应全局指令
+  globalStore.registerRefreshFunction('transexp2', () => {
+    // 使用新的唯一key
+    selectedCategory.value = globalStore.ruleCategory
   })
-  globalStore.registerClearFunction('exp1', () => {
-    selectedSize.value = 'null'
+  globalStore.registerClearFunction('transexp2', () => {
+    selectedCategory.value = 'null'
   })
+
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    myChart.setOption(chartOptions.value)
+    myChart.setOption(getChartOptions())
     startDataFluctuation()
   }
 })
@@ -58,48 +58,80 @@ watchEffect(() => {
   })
 })
 
+// --- 3. 图表数据 ---
+
 const originalData = {
-  '1k': [
-    { category: 'acl1', EffiMatch: 0.002, NeuTree: 0.003, NuevoMatch: 50 },
-    { category: 'acl2', EffiMatch: 0.002, NeuTree: 0.004, NuevoMatch: 60 },
-    { category: 'acl3', EffiMatch: 0.002, NeuTree: 0.005, NuevoMatch: 70 },
-    { category: 'acl4', EffiMatch: 0.002, NeuTree: 0.004, NuevoMatch: 60 },
-    { category: 'acl5', EffiMatch: 0.002, NeuTree: 0.005, NuevoMatch: 30 },
-    { category: 'fw1', EffiMatch: 0.002, NeuTree: 0.008, NuevoMatch: 40 },
-    { category: 'fw2', EffiMatch: 0.002, NeuTree: 0.009, NuevoMatch: 50 },
-    { category: 'fw3', EffiMatch: 0.002, NeuTree: 0.006, NuevoMatch: 30 },
-    { category: 'fw4', EffiMatch: 0.002, NeuTree: 0.007, NuevoMatch: 20 },
-    { category: 'fw5', EffiMatch: 0.002, NeuTree: 0.008, NuevoMatch: 30 },
-    { category: 'ipc1', EffiMatch: 0.002, NeuTree: 0.004, NuevoMatch: 40 },
-    { category: 'ipc2', EffiMatch: 0.002, NeuTree: 0.005, NuevoMatch: 70 }
+  acl: [
+    {
+      name: 'TabTree w/ TransTuple',
+      data: [
+        [0, 0.43],
+        [20, 0.45],
+        [40, 0.47],
+        [60, 0.48],
+        [80, 0.49],
+        [100, 0.51]
+      ]
+    },
+    {
+      name: 'TabTree',
+      data: [
+        [0, 0.43],
+        [20, 0.52],
+        [40, 0.68],
+        [60, 0.73],
+        [80, 0.85],
+        [100, 0.98]
+      ]
+    }
   ],
-  '10k': [
-    { category: 'acl1', EffiMatch: 0.03, NeuTree: 0.4, NuevoMatch: 100 },
-    { category: 'acl2', EffiMatch: 0.03, NeuTree: 0.5, NuevoMatch: 120 },
-    { category: 'acl3', EffiMatch: 0.03, NeuTree: 0.6, NuevoMatch: 150 },
-    { category: 'acl4', EffiMatch: 0.03, NeuTree: 0.5, NuevoMatch: 120 },
-    { category: 'acl5', EffiMatch: 0.03, NeuTree: 0.6, NuevoMatch: 80 },
-    { category: 'fw1', EffiMatch: 0.03, NeuTree: 0.8, NuevoMatch: 100 },
-    { category: 'fw2', EffiMatch: 0.03, NeuTree: 0.9, NuevoMatch: 120 },
-    { category: 'fw3', EffiMatch: 0.03, NeuTree: 0.7, NuevoMatch: 80 },
-    { category: 'fw4', EffiMatch: 0.03, NeuTree: 0.8, NuevoMatch: 60 },
-    { category: 'fw5', EffiMatch: 0.03, NeuTree: 0.9, NuevoMatch: 80 },
-    { category: 'ipc1', EffiMatch: 0.03, NeuTree: 0.5, NuevoMatch: 100 },
-    { category: 'ipc2', EffiMatch: 0.03, NeuTree: 0.6, NuevoMatch: 250 }
+  fw: [
+    {
+      name: 'TabTree w/ TransTuple',
+      data: [
+        [0, 0.48],
+        [20, 0.52],
+        [40, 0.55],
+        [60, 0.57],
+        [80, 0.6],
+        [100, 0.62]
+      ]
+    },
+    {
+      name: 'TabTree',
+      data: [
+        [0, 0.48],
+        [20, 0.58],
+        [40, 0.68],
+        [60, 0.75],
+        [80, 0.95],
+        [100, 1.05]
+      ]
+    }
   ],
-  '100k': [
-    { category: 'acl1', EffiMatch: 15, NeuTree: 30, NuevoMatch: 400 },
-    { category: 'acl2', EffiMatch: 12, NeuTree: 40, NuevoMatch: 500 },
-    { category: 'acl3', EffiMatch: 13, NeuTree: 50, NuevoMatch: 1100 },
-    { category: 'acl4', EffiMatch: 12, NeuTree: 40, NuevoMatch: 600 },
-    { category: 'acl5', EffiMatch: 13, NeuTree: 45, NuevoMatch: 700 },
-    { category: 'fw1', EffiMatch: 15, NeuTree: 60, NuevoMatch: 800 },
-    { category: 'fw2', EffiMatch: 18, NeuTree: 70, NuevoMatch: 900 },
-    { category: 'fw3', EffiMatch: 12, NeuTree: 50, NuevoMatch: 600 },
-    { category: 'fw4', EffiMatch: 11, NeuTree: 55, NuevoMatch: 500 },
-    { category: 'fw5', EffiMatch: 12, NeuTree: 60, NuevoMatch: 700 },
-    { category: 'ipc1', EffiMatch: 15, NeuTree: 40, NuevoMatch: 800 },
-    { category: 'ipc2', EffiMatch: 18, NeuTree: 50, NuevoMatch: 900 }
+  ipc: [
+    {
+      name: 'TabTree w/ TransTuple',
+      data: [
+        [0, 0.68],
+        [20, 0.7],
+        [40, 0.73],
+        [60, 0.75],
+        [80, 0.78],
+        [100, 0.8]
+      ]
+    },
+    {
+      name: 'TabTree',
+      data: [
+        [0, 0.68],
+        [20, 0.75],
+        [40, 0.82],
+        [60, 0.92],
+        [80, 1.05],
+        [100, 1.2]
+      ]
+    }
   ]
 }
 
@@ -109,20 +141,14 @@ function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
     for (const key in originalData) {
-      const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: number | string }
-        ;['EffiMatch'].forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.6 + Math.random() * 0.7
-          const floatedValue = originalValue * multiplier
-          newItem[algo as keyof typeof item] =
-            floatedValue < 1
-              ? parseFloat(floatedValue.toPrecision(2))
-              : parseFloat(floatedValue.toFixed(2))
-        })
-        return newItem
-      })
+      const categoryKey = key as keyof typeof originalData
+      liveData.value[categoryKey] = originalData[categoryKey].map((seriesItem) => ({
+        ...seriesItem,
+        data: seriesItem.data.map((point) => [
+          point[0],
+          parseFloat((point[1] * (0.95 + Math.random() * 0.1)).toFixed(3))
+        ])
+      }))
     }
   }, 1000)
 }
@@ -134,52 +160,55 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => {
-  if (!globalStore.isStarted) {
-    return []
+// --- 4. ECharts 配置项生成函数 ---
+
+function getChartOptions(isUpdate = false) {
+  // ✨ 核心修正 3：配置生成逻辑依赖本地的 selectedCategory
+  const categoryKey = selectedCategory.value as keyof typeof liveData.value
+  const currentSeries = liveData.value[categoryKey] || []
+
+  const tabTreeSeries = currentSeries.find((s: { name: string }) => s.name === 'TabTree')
+  const transTupleSeries = currentSeries.find(
+    (s: { name: string }) => s.name === 'TabTree w/ TransTuple'
+  )
+  let markPoints: any[] = []
+  if (tabTreeSeries && transTupleSeries) {
+    markPoints = tabTreeSeries.data
+      .map((point: number[], index: string | number) => {
+        const transTupleY = transTupleSeries.data[index][1]
+        const ratio = transTupleY > 1e-6 ? point[1] / transTupleY : 1.0
+        return { value: `${ratio.toFixed(1)}X`, coord: point }
+      })
+      .slice(1)
   }
-  return liveData.value[selectedSize.value]
-})
 
-const chartOptions = computed(() => {
-  const algorithms = ['EffiMatch', 'NeuTree', 'NuevoMatch']
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
-
-  const series = algorithms.map((algo) => {
-    let color, decalPattern
-    switch (algo) {
-      case 'EffiMatch':
-        color = '#73b96e'
-        decalPattern = {
-          symbol: 'rect',
-          rotation: Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
-        }
+  const seriesConfig = currentSeries.map((seriesItem: { name: any; data: any }) => {
+    let style = {}
+    switch (seriesItem.name) {
+      case 'TabTree w/ TransTuple':
+        style = { color: '#e62429', lineStyle: { type: 'solid' }, symbol: 'circle', symbolSize: 8 }
         break
-      case 'NeuTree':
-        color = '#f07c79'
-        decalPattern = { symbol: 'line', rotation: 0, color: 'rgba(0, 0, 0, 0.4)', symbolSize: 0.8 }
-        break
-      case 'NuevoMatch':
-        color = '#5b8ff9'
-        decalPattern = {
+      case 'TabTree':
+        style = {
+          color: '#3366cc',
+          lineStyle: { type: 'dashed' },
           symbol: 'rect',
-          rotation: -Math.PI / 4,
-          color: 'rgba(0, 0, 0, 0.4)',
-          symbolSize: 0.6
+          symbolSize: 8,
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: 8,
+            label: { position: 'top', color: '#000', fontSize: 14, fontWeight: 'bold' },
+            data: markPoints
+          }
         }
         break
     }
     return {
-      name: algo,
-      type: 'bar',
-      barGap: 0,
-      emphasis: { focus: 'series' },
-      data: currentChartData.value.map(
-        (item: { [x: string]: any }) => item[algo as keyof typeof item]
-      ),
-      itemStyle: { color, decal: decalPattern }
+      name: seriesItem.name,
+      type: 'line',
+      data: seriesItem.data,
+      showSymbol: true,
+      ...style
     }
   })
 
@@ -187,45 +216,57 @@ const chartOptions = computed(() => {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { textStyle: { fontSize: 12 }, top: 'bottom' },
-    grid: { top: '5%', left: '7%', right: '4%', bottom: '10%', containLabel: true },
-    xAxis: { type: 'category', data: categories },
-    yAxis: {
-      type: 'log',
-      name: 'Constr. Time (s)',
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    grid: { top: '2%', left: '8%', right: '4%', bottom: '20%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      name: 'Compression Ratio',
       nameLocation: 'middle',
-      nameGap: 45,
-      axisLabel: {
-        formatter: (value: number) => {
-          if (value === 0) return 0
-          if (value < 1) return value.toExponential(0) // 1e-3, 1e-2, etc.
-          return value
-        }
-      }
+      nameGap: 30,
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: '{value}%' }
     },
-    series: series
+    yAxis: {
+      type: 'value',
+      name: 'Latency (μs)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      min: 0,
+      max: 1.3
+    },
+    series: seriesConfig
   }
-})
+}
 
-watch(chartOptions, (newOptions, oldOptions) => {
-  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
-    myChart.setOption(newOptions, true)
+// --- 5. 监听器 ---
+
+// ✨ 核心修正 4：监听器依赖本地的 selectedCategory
+watch(
+  [liveData, selectedCategory],
+  () => {
+    if (!myChart || !globalStore.isStarted) {
+      myChart?.setOption({ series: [] })
+      return
+    }
+    myChart.setOption(getChartOptions(true))
+  },
+  { deep: true }
+)
+
+watch(
+  () => globalStore.isStarted,
+  (isStarted) => {
+    if (myChart && isStarted) {
+      myChart.setOption(getChartOptions())
+    } else if (myChart && !isStarted) {
+      myChart.setOption({ series: [] })
+    }
   }
-})
+)
 </script>
 
 <style scoped>
-.controls-container {
-  margin: 0 10%;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.controls-container label {
-  min-width: 110px;
-  margin-right: 8px;
-  font-size: 14px;
-}
+/* 样式保持不变 */
 </style>

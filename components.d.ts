@@ -7,8 +7,9 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    copy: typeof import('./src/components/hdc-exp2 copy.vue')['default']
+    copy: typeof import('./src/components/hdc-exp4 copy.vue')['default']
     CreatePackets: typeof import('./src/components/CreatePackets.vue')['default']
+    CreatePacketsType: typeof import('./src/components/CreatePacketsType.vue')['default']
     DropGraph: typeof import('./src/components/DropGraph.vue')['default']
     EatGraph: typeof import('./src/components/EatGraph.vue')['default']
     EffimatchExp1: typeof import('./src/components/effimatch-exp1.vue')['default']

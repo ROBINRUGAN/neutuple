@@ -1,12 +1,14 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">恢复率分析</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">
+    规则爆炸率
+  </div>
 
   <div
     ref="chartContainer"
+    style="width: 100%; height: 320px"
     :style="{
       opacity: globalStore.isStarted ? 1 : 0
     }"
-    style="width: 100%; height: 320px"
   ></div>
 </template>
 
@@ -19,48 +21,26 @@ import { useGlobalStore } from '@/stores/global'
 
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
-let intervalId: number | null = null
 const globalStore = useGlobalStore()
-const originalData = ref<[number, number][]>([
-  [0, 0],
-  [0.05, 2.5],
-  [0.1, 5],
-  [0.15, 8.5],
-  [0.2, 12],
-  [0.25, 15],
-  [0.3, 18],
-  [0.35, 20.5],
-  [0.4, 23],
-  [0.45, 25.5],
-  [0.5, 28],
-  [0.53, 33],
-  [0.55, 38],
-  [0.58, 44],
-  [0.6, 50],
-  [0.63, 55],
-  [0.65, 60],
-  [0.68, 67.5],
-  [0.7, 75],
-  [0.75, 80],
-  [0.8, 85],
-  [0.85, 88.5],
-  [0.9, 91.333],
-  [0.95, 95.66],
-  [1, 100]
-])
 
-const liveData = ref<[number, number][]>(JSON.parse(JSON.stringify(originalData.value)))
-
-const initialTargetY = originalData.value.find((p) => p[0] === 0.9)?.[1] || 91.333
-const targetYValue = ref(initialTargetY)
+// 本地状态由全局Store驱动
+const selectedSize = ref<string>(globalStore.ruleScale)
+let intervalId: number | null = null
 
 // --- 2. 生命周期和图表实例管理 ---
 
 onMounted(() => {
+  // ✨ 向全局Store注册回调，标识符可以保持不变或更新
+  globalStore.registerRefreshFunction('neuexp1', (size: string) => {
+    selectedSize.value = size
+  })
+  globalStore.registerClearFunction('neuexp1', () => {
+    selectedSize.value = 'null'
+  })
+
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    // ✨ 注意：这里不再需要 setOption，因为 watch 会立即执行一次
-    // myChart.setOption(chartOptions.value)
+    myChart.setOption(chartOptions.value)
     startDataFluctuation()
   }
 })
@@ -79,38 +59,58 @@ watchEffect(() => {
   })
 })
 
+// --- 3. 图表数据 ---
+
+// ✨ 更新为新图表的数据
+const originalData = {
+  '1k': [
+    { category: 8, ACL: 36, FW: 28, IPC: 7 },
+    { category: 10, ACL: 32, FW: 27, IPC: 6.5 },
+    { category: 12, ACL: 29, FW: 33, IPC: 6.5 },
+    { category: 14, ACL: 21, FW: 30, IPC: 6 },
+    { category: 16, ACL: 20.5, FW: 25, IPC: 5.5 },
+    { category: 18, ACL: 18, FW: 20, IPC: 5 }
+  ],
+  '10k': [
+    { category: 8, ACL: 32, FW: 6, IPC: 22 },
+    { category: 10, ACL: 28, FW: 6, IPC: 21 },
+    { category: 12, ACL: 24, FW: 6, IPC: 20.5 },
+    { category: 14, ACL: 21, FW: 6, IPC: 20 },
+    { category: 16, ACL: 19, FW: 5.8, IPC: 19 },
+    { category: 18, ACL: 17, FW: 5.8, IPC: 18 }
+  ],
+  '100k': [
+    { category: 8, ACL: 14.5, FW: 2.5, IPC: 4.2 },
+    { category: 10, ACL: 14.5, FW: 2, IPC: 4 },
+    { category: 12, ACL: 14, FW: 1.8, IPC: 3.5 },
+    { category: 14, ACL: 7, FW: 1.5, IPC: 2.5 },
+    { category: 16, ACL: 4, FW: 1.2, IPC: 2.2 },
+    { category: 18, ACL: 4, FW: 1.2, IPC: 2.2 }
+  ]
+}
+
+const liveData = ref(JSON.parse(JSON.stringify(originalData)))
+
+// ✨ 更新为新的算法列表
+const algorithms = ['ACL', 'FW', 'IPC']
+
 function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
-    const newPoints: [number, number][] = []
-    if (originalData.value.length === 0) {
-      liveData.value = []
-      return
+    for (const key in originalData) {
+      const sizeKey = key as keyof typeof originalData
+      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
+        const newItem = { ...item } as { [key: string]: any }
+        algorithms.forEach((algo) => {
+          const originalValue = item[algo as keyof typeof item] as number
+          // Fluctuate data by up to +/- 5% to keep it visually stable
+          const multiplier = 0.975 + Math.random() * 0.05
+          newItem[algo] = parseFloat((originalValue * multiplier).toFixed(2))
+        })
+        return newItem
+      })
     }
-
-    const firstPoint = originalData.value[0]
-    const firstMultiplier = 0.9 + Math.random() * 0.2
-    const newFirstY = Math.min(100, firstPoint[1] * firstMultiplier)
-    newPoints.push([firstPoint[0], parseFloat(newFirstY.toFixed(3))])
-
-    for (let i = 1; i < originalData.value.length; i++) {
-      const prevOriginalPoint = originalData.value[i - 1]
-      const currentOriginalPoint = originalData.value[i]
-      const prevNewY = newPoints[i - 1][1]
-      const originalIncrement = currentOriginalPoint[1] - prevOriginalPoint[1]
-      const incrementMultiplier = 0.9 + Math.random() * 0.2
-      const newIncrement = originalIncrement * incrementMultiplier
-      let newCurrentY = prevNewY + newIncrement
-      newCurrentY = Math.min(100, Math.max(prevNewY, newCurrentY))
-      newPoints.push([currentOriginalPoint[0], parseFloat(newCurrentY.toFixed(3))])
-    }
-
-    liveData.value = newPoints
-    const newTargetPoint = newPoints.find((p) => p[0] === 0.9)
-    if (newTargetPoint) {
-      targetYValue.value = newTargetPoint[1]
-    }
-  }, 1000)
+  }, 800) // Slightly slower fluctuation
 }
 
 function stopDataFluctuation() {
@@ -120,83 +120,129 @@ function stopDataFluctuation() {
   }
 }
 
+const currentChartData = computed(() => {
+  if (!globalStore.isStarted || !liveData.value[selectedSize.value]) {
+    // Return empty structure to avoid errors before selection
+    return []
+  }
+  return liveData.value[selectedSize.value]
+})
+
+// --- 4. ECharts 配置项 ---
+
 const chartOptions = computed(() => {
+  const categories = currentChartData.value.map((item: { category: string }) => item.category)
+
+  const series = algorithms.map((algo) => {
+    let color, symbol, lineStyle
+    // ✨ 更新系列样式以匹配原图
+    switch (algo) {
+      case 'ACL':
+        color = '#008b8b' // Teal color
+        symbol = 'star'
+        lineStyle = { type: 'dashed' }
+        break
+      case 'FW':
+        color = '#696969' // Gray color
+        symbol = 'circle'
+        lineStyle = { type: 'dashdot' }
+        break
+      case 'IPC':
+        color = '#9ACD32' // Lime green color
+        symbol = 'circle'
+        lineStyle = { type: 'solid' }
+        break
+    }
+
+    return {
+      name: algo,
+      type: 'line',
+      symbol: symbol,
+      symbolSize: 8,
+      lineStyle: lineStyle,
+      itemStyle: { color },
+      data: currentChartData.value.map(
+        (item: { [x: string]: any }) => item[algo as keyof typeof item]
+      )
+    }
+  })
+
+  // ✨ 动态Y轴范围
+  let yAxisMax = 35
+  if (selectedSize.value === '1k') yAxisMax = 40
+  if (selectedSize.value === '100k') yAxisMax = 16
+
   return {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any) => {
-        const point = params[0]
-        return `
-          压缩率: ${point.axisValue.toFixed(3)}<br/>
-          恢复率: ${point.data[1].toFixed(3)}%
-        `
-      }
+    tooltip: { trigger: 'axis' },
+    legend: {
+      bottom: 0,
+      textStyle: { fontSize: 12 },
+      // ✨ 让图例也显示标记点形状
+      data: algorithms.map((algo) => ({
+        name: algo,
+        icon: series.find((s) => s.name === algo)?.symbol || 'circle'
+      }))
     },
-    grid: { left: '15%', right: '5%', bottom: '25%', top: '5%', containLabel: false },
+    grid: { top: '5%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
     xAxis: {
-      type: 'value',
-      name: 'Compression Ratio',
+      type: 'category',
+      data: categories,
+      // ✨ 动态X轴标签
+      name: `Bucket Size (${selectedSize.value})`,
       nameLocation: 'middle',
-      nameGap: 30,
-      min: 0,
-      max: 1
+      nameGap: 30
     },
     yAxis: {
       type: 'value',
-      name: 'Recovery Rate(%)',
+      // ✨ 更新Y轴信息
+      name: 'Expansion Ratio (%)',
       nameLocation: 'middle',
-      nameGap: 50,
+      nameGap: 40,
       min: 0,
-      max: 100,
-      axisLabel: { formatter: '{value}%' }
+      max: yAxisMax
     },
-    series: [
-      {
-        type: 'line',
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(180, 140, 220, 0.6)' },
-            { offset: 1, color: 'rgba(180, 140, 220, 0.1)' }
-          ])
-        },
-        lineStyle: { color: 'rgba(180, 140, 220, 1)', width: 2 },
-        itemStyle: { color: 'rgba(180, 140, 220, 1)' },
-        smooth: true,
-        showSymbol: false,
-        data: liveData.value,
-        markLine: {
-          symbol: 'none',
-          lineStyle: { type: 'dashed', color: '#333' },
-          label: { position: 'insideEndTop', formatter: '{b}' },
-          emphasis: { disabled: true },
-          data: [
-            {
-              yAxis: targetYValue.value,
-              name: `${targetYValue.value.toFixed(3)}%`,
-              label: { position: 'insideStartTop' }
-            },
-            { xAxis: 0.9, name: '0.9' }
-          ]
-        }
-      }
-    ]
+    series: series
   }
 })
 
-watch(
-  chartOptions,
-  (newOptions) => {
-    if (myChart) {
-      myChart.setOption(newOptions)
+watch(chartOptions, (newOptions, oldOptions) => {
+  // Avoid re-rendering for minor data fluctuations if structure is the same
+  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
+    myChart.setOption(newOptions, false) // Use false to avoid full redraw for smoother updates
+  } else if (myChart) {
+    myChart.setOption(newOptions, { notMerge: true, lazyUpdate: true })
+  }
+})
+
+// More efficient watch for just data updates
+watch(currentChartData, (newData) => {
+  if (myChart) {
+    const option = {
+      series: algorithms.map((algo) => ({
+        name: algo,
+        data: newData.map((item: { [x: string]: any }) => item[algo])
+      }))
     }
-  },
-  { immediate: true }
-)
+    myChart.setOption(option)
+  }
+})
 </script>
 
+
 <style scoped>
-/* You can add styles here if needed */
+.controls-container {
+  margin: 0 10%;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.controls-container label {
+  min-width: 110px;
+  margin-right: 8px;
+  font-size: 14px;
+}
 </style>

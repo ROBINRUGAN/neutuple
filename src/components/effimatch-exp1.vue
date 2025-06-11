@@ -1,36 +1,45 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">各包分类器的内存开销</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">分类延迟分析 (CutTSS)</div>
 
   <div
     ref="chartContainer"
-    style="width: 100%; height: 320px"
-    :style="{ opacity: globalStore.isStarted ? 1 : 0 }"
+    style="width: 100%; height: 350px"
+    :style="{
+      opacity: globalStore.isStarted ? 1 : 0
+    }"
   ></div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
 
-const globalStore = useGlobalStore()
+// --- 1. 响应式状态定义 ---
+
 const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
+const globalStore = useGlobalStore()
 
-const selectedSize = ref<string>(globalStore.ruleScale)
+// 本地状态由全局Store通过回调函数来驱动
+const selectedCategory = ref<string>(globalStore.ruleCategory)
 let intervalId: number | null = null
 
+// --- 2. 生命周期和图表实例管理 ---
+
 onMounted(() => {
-  globalStore.registerRefreshFunction('exp1', (size: string) => {
-    selectedSize.value = size
+  // 注册回调函数，用于接收外部指令来更新本地状态
+  globalStore.registerRefreshFunction('transexp1', () => {
+    selectedCategory.value = globalStore.ruleCategory
   })
-  globalStore.registerClearFunction('exp1', () => {
-    selectedSize.value = 'null'
+  globalStore.registerClearFunction('transexp1', () => {
+    // 设置一个无效的 key 来清空图表
+    selectedCategory.value = 'null'
   })
 
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    myChart.setOption(chartOptions.value)
+    myChart.setOption(getChartOptions())
     startDataFluctuation()
   }
 })
@@ -49,131 +58,97 @@ watchEffect(() => {
   })
 })
 
+// --- 3. 图表数据 ---
+
 const originalData = {
-  '1k': [
+  acl: [
     {
-      category: 'ACL',
-      EffiMatch: 16.8,
-      NeuTree: 15.9,
-      NuevoMatch: 23.1,
-      TabTree: 43.9,
-      KickTree: 37.2,
-      PSTSS: 47.6,
-      CutSplit: 25.8
+      name: 'CutTSS w/ TransTuple',
+      data: [
+        [0, 0.22],
+        [20, 0.18],
+        [40, 0.25],
+        [60, 0.26],
+        [80, 0.28],
+        [100, 0.29]
+      ]
     },
     {
-      category: 'FW',
-      EffiMatch: 18.9,
-      NeuTree: 13.5,
-      NuevoMatch: 25.2,
-      TabTree: 44.8,
-      KickTree: 34.1,
-      PSTSS: 47.3,
-      CutSplit: 23.9
-    },
-    {
-      category: 'IPC',
-      EffiMatch: 15.3,
-      NeuTree: 12.1,
-      NuevoMatch: 14.2,
-      TabTree: 47.5,
-      KickTree: 24.3,
-      PSTSS: 48.1,
-      CutSplit: 27.1
+      name: 'CutTSS',
+      data: [
+        [0, 0.22],
+        [20, 0.29],
+        [40, 0.42],
+        [60, 0.6],
+        [80, 0.7],
+        [100, 0.82]
+      ]
     }
   ],
-  '10k': [
+  fw: [
     {
-      category: 'ACL',
-      EffiMatch: 17.5,
-      NeuTree: 18.2,
-      NuevoMatch: 25.1,
-      TabTree: 44.3,
-      KickTree: 39.8,
-      PSTSS: 47.8,
-      CutSplit: 29.7
+      name: 'CutTSS w/ TransTuple',
+      data: [
+        [0, 0.25],
+        [20, 0.28],
+        [40, 0.3],
+        [60, 0.32],
+        [80, 0.35],
+        [100, 0.38]
+      ]
     },
     {
-      category: 'FW',
-      EffiMatch: 13.2,
-      NeuTree: 12.8,
-      NuevoMatch: 22.9,
-      TabTree: 33.6,
-      KickTree: 26.4,
-      PSTSS: 47.1,
-      CutSplit: 24.2
-    },
-    {
-      category: 'IPC',
-      EffiMatch: 14.9,
-      NeuTree: 9.3,
-      NuevoMatch: 18.5,
-      TabTree: 30.9,
-      KickTree: 23.7,
-      PSTSS: 48.3,
-      CutSplit: 21.5
+      name: 'CutTSS',
+      data: [
+        [0, 0.25],
+        [20, 0.38],
+        [40, 0.5],
+        [60, 0.62],
+        [80, 0.82],
+        [100, 0.88]
+      ]
     }
   ],
-  '100k': [
+  ipc: [
     {
-      category: 'ACL',
-      EffiMatch: 12.7,
-      NeuTree: 16.5,
-      NuevoMatch: 24.6,
-      TabTree: 33.1,
-      KickTree: 27.6,
-      PSTSS: 47.5,
-      CutSplit: 24.8
+      name: 'CutTSS w/ TransTuple',
+      data: [
+        [0, 0.28],
+        [20, 0.3],
+        [40, 0.32],
+        [60, 0.33],
+        [80, 0.35],
+        [100, 0.36]
+      ]
     },
     {
-      category: 'FW',
-      EffiMatch: 13.9,
-      NeuTree: 15.2,
-      NuevoMatch: 21.8,
-      TabTree: 23.9,
-      KickTree: 28.5,
-      PSTSS: 47.9,
-      CutSplit: 26.3
-    },
-    {
-      category: 'IPC',
-      EffiMatch: 12.1,
-      NeuTree: 11.5,
-      NuevoMatch: 11.8,
-      TabTree: 22.5,
-      KickTree: 27.9,
-      PSTSS: 45.6,
-      CutSplit: 20.8
+      name: 'CutTSS',
+      data: [
+        [0, 0.28],
+        [20, 0.35],
+        [40, 0.52],
+        [60, 0.65],
+        [80, 0.78],
+        [100, 0.92]
+      ]
     }
   ]
 }
 
 const liveData = ref(JSON.parse(JSON.stringify(originalData)))
 
-const algorithms = [
-  'EffiMatch',
-  'NeuTree',
-  'NuevoMatch',
-  'TabTree',
-  'KickTree',
-  'PSTSS',
-  'CutSplit'
-]
-
 function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
     for (const key in originalData) {
-      const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: any }
-        ;['EffiMatch'].forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.8 + Math.random() * 0.4
-          newItem[algo] = parseFloat((originalValue * multiplier).toFixed(2))
-        })
-        return newItem
-      })
+      const categoryKey = key as keyof typeof originalData
+      liveData.value[categoryKey] = originalData[categoryKey].map((seriesItem) => ({
+        ...seriesItem,
+        data: seriesItem.data.map((point) => [
+          point[0],
+          parseFloat((point[1] * (0.95 + Math.random() * 0.1)).toFixed(3))
+        ])
+      }))
     }
   }, 1000)
 }
@@ -185,57 +160,120 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => {
-  if (!globalStore.isStarted) {
-    return []
+// --- 4. ECharts 配置项生成函数 ---
+
+function getChartOptions(isUpdate = false) {
+  // ✨ 核心修正 1：从本地的 selectedCategory 获取 key
+  const categoryKey = selectedCategory.value as keyof typeof liveData.value
+  const currentSeries = liveData.value[categoryKey] || []
+
+  const cutTssSeries = currentSeries.find((s: { name: string }) => s.name === 'CutTSS')
+  const transTupleSeries = currentSeries.find(
+    (s: { name: string }) => s.name === 'CutTSS w/ TransTuple'
+  )
+  let markPoints: any[] = []
+  if (cutTssSeries && transTupleSeries) {
+    markPoints = cutTssSeries.data
+      .map((point: number[], index: number) => {
+        const transTupleY = transTupleSeries.data[index][1]
+        const ratio = transTupleY > 1e-6 ? point[1] / transTupleY : 1.0
+        return { value: `${ratio.toFixed(1)}X`, coord: point }
+      })
+      .slice(1)
   }
-  return liveData.value[selectedSize.value]
-})
 
-const chartOptions = computed(() => {
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
+  const seriesConfig = currentSeries.map((seriesItem: { name: any; data: any }) => {
+    let style = {}
+    switch (seriesItem.name) {
+      case 'CutTSS w/ TransTuple':
+        style = { color: '#e62429', lineStyle: { type: 'solid' }, symbol: 'circle', symbolSize: 8 }
+        break
+      case 'CutTSS':
+        style = {
+          color: '#3366cc',
+          lineStyle: { type: 'dashed' },
+          symbol: 'rect',
+          symbolSize: 8,
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: 8,
+            label: { position: 'top', color: '#000', fontSize: 14, fontWeight: 'bold' },
+            data: markPoints
+          }
+        }
+        break
+    }
+    return {
+      name: seriesItem.name,
+      type: 'line',
+      data: seriesItem.data,
+      showSymbol: true,
+      ...style
+    }
+  })
 
-  const seriesData = algorithms.map((algo) => ({
-    name: algo,
-    type: 'bar',
-    barGap: 0,
-    emphasis: { focus: 'series' },
-    data: currentChartData.value.map(
-      (item: { [x: string]: number }) => item[algo as keyof typeof item]
-    )
-  }))
+  if (isUpdate) {
+    return { series: seriesConfig }
+  }
 
   return {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    legend: { data: algorithms, textStyle: { fontSize: 12 }, top: 'bottom' },
-    grid: { left: '10%', right: '4%', bottom: '20%', top: '5%', containLabel: true },
-    xAxis: [
-      {
-        type: 'category',
-        data: categories,
-        axisLabel: { interval: 0, rotate: 0 }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'value',
-        name: 'Byte / Rule',
-        nameLocation: 'middle',
-        nameGap: 45
-      }
-    ],
-    series: seriesData
+    tooltip: { trigger: 'axis' },
+    legend: { bottom: 0, textStyle: { fontSize: 12 } },
+    grid: { top: '2%', left: '8%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      name: 'Compression Ratio',
+      nameLocation: 'middle',
+      nameGap: 30,
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: '{value}%' }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Latency (μs)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      min: 0,
+      max: 1.0
+    },
+    series: seriesConfig
   }
-})
+}
 
-watch(chartOptions, (newOptions, oldOptions) => {
-  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
-    myChart.setOption(newOptions, true)
+// --- 5. 监听器 ---
+
+// ✨ 核心修正 2：监听 liveData 和本地的 selectedCategory
+watch(
+  [liveData, selectedCategory],
+  () => {
+    if (!myChart || !globalStore.isStarted) {
+      // 如果全局是停止状态，可以清空图表
+      myChart?.setOption({ series: [] })
+      return
+    }
+    myChart.setOption(getChartOptions(true))
+  },
+  { deep: true }
+)
+
+// 当全局启动状态变化时，也触发一次图表更新
+watch(
+  () => globalStore.isStarted,
+  (isStarted) => {
+    if (myChart && isStarted) {
+      myChart.setOption(getChartOptions())
+    } else if (myChart && !isStarted) {
+      // 如果从启动变为停止，也清空图表
+      myChart.setOption({ series: [] })
+    }
   }
-})
+)
 </script>
 
-<style scoped></style>
+<style scoped>
+/* 样式保持不变 */
+</style>

@@ -1,9 +1,9 @@
 <template>
-  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">单次查询偏移分析</div>
+  <div style="margin: 15px 0; font-size: 18px; font-weight: bold">更新速度对比 (Update Speed)</div>
 
   <div
     ref="chartContainer"
-    style="width: 100%; height: 320px"
+    style="width: 100%; height: 330px"
     :style="{
       opacity: globalStore.isStarted ? 1 : 0
     }"
@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useGlobalStore } from '@/stores/global'
 
@@ -21,24 +21,22 @@ const chartContainer = ref<HTMLElement | null>(null)
 let myChart: echarts.ECharts | null = null
 const globalStore = useGlobalStore()
 
-// 本地状态由全局Store驱动
-const selectedSize = ref<string>(globalStore.ruleScale)
+const selectedCategory = ref<string>(globalStore.ruleCategory)
 let intervalId: number | null = null
 
 // --- 2. 生命周期和图表实例管理 ---
 
 onMounted(() => {
-  // ✨ 向全局Store注册回调，使用新的标识符 'exp6'
-  globalStore.registerRefreshFunction('exp6', (size: string) => {
-    selectedSize.value = size
+  // ✨ 使用新的唯一key
+  globalStore.registerRefreshFunction('updateexp', () => {
+    selectedCategory.value = globalStore.ruleCategory
   })
-  globalStore.registerClearFunction('exp6', () => {
-    selectedSize.value = 'null'
+  globalStore.registerClearFunction('updateexp', () => {
+    selectedCategory.value = 'null'
   })
-
   if (chartContainer.value) {
     myChart = echarts.init(chartContainer.value)
-    myChart.setOption(chartOptions.value)
+    myChart.setOption(getChartOptions())
     startDataFluctuation()
   }
 })
@@ -51,79 +49,99 @@ onUnmounted(() => {
   stopDataFluctuation()
 })
 
-watchEffect(() => {
-  window.addEventListener('resize', () => {
-    myChart?.resize()
-  })
-})
-
 // --- 3. 图表数据 ---
 
-// ✨ 更新为新图表的数据
+// ✨ 1. 数据重构：根据新的论文图 (Fig. 13) 更新数据
 const originalData = {
-  '1k': [
-    { category: 'acl1', RBIMI: 0.15, RBMI: 0.35, RMI: 0.12 },
-    { category: 'acl2', RBIMI: 0.18, RBMI: 0.25, RMI: 0.12 },
-    { category: 'acl3', RBIMI: 0.15, RBMI: 0.28, RMI: 0.12 },
-    { category: 'acl4', RBIMI: 0.15, RBMI: 0.28, RMI: 0.12 },
-    { category: 'acl5', RBIMI: 0.35, RBMI: 0.52, RMI: 0.12 },
-    { category: 'fw1', RBIMI: 0.18, RBMI: 0.25, RMI: 0.08 },
-    { category: 'fw2', RBIMI: 0.15, RBMI: 0.25, RMI: 0.08 },
-    { category: 'fw3', RBIMI: 0.15, RBMI: 0.22, RMI: 0.08 },
-    { category: 'fw4', RBIMI: 0.15, RBMI: 0.22, RMI: 0.08 },
-    { category: 'fw5', RBIMI: 0.15, RBMI: 0.22, RMI: 0.08 },
-    { category: 'ipc1', RBIMI: 0.15, RBMI: 0.22, RMI: 0.08 },
-    { category: 'ipc2', RBIMI: 0.25, RBMI: 0.4, RMI: 0.08 }
-  ],
-  '10k': [
-    { category: 'acl1', RBIMI: 0.22, RBMI: 0.25, RMI: 0.12 },
-    { category: 'acl2', RBIMI: 0.18, RBMI: 0.2, RMI: 0.12 },
-    { category: 'acl3', RBIMI: 0.18, RBMI: 0.28, RMI: 0.12 },
-    { category: 'acl4', RBIMI: 0.2, RBMI: 0.32, RMI: 0.12 },
-    { category: 'acl5', RBIMI: 0.42, RBMI: 0.62, RMI: 0.12 },
-    { category: 'fw1', RBIMI: 0.15, RBMI: 0.15, RMI: 0.08 },
-    { category: 'fw2', RBIMI: 0.12, RBMI: 0.15, RMI: 0.08 },
-    { category: 'fw3', RBIMI: 0.15, RBMI: 0.18, RMI: 0.08 },
-    { category: 'fw4', RBIMI: 0.12, RBMI: 0.18, RMI: 0.08 },
-    { category: 'fw5', RBIMI: 0.15, RBMI: 0.18, RMI: 0.08 },
-    { category: 'ipc1', RBIMI: 0.2, RBMI: 0.25, RMI: 0.08 },
-    { category: 'ipc2', RBIMI: 0.15, RBMI: 0.2, RMI: 0.08 }
-  ],
-  '100k': [
-    { category: 'acl1', RBIMI: 0.12, RBMI: 0.24, RMI: 1.2e-1 },
-    { category: 'acl2', RBIMI: 0.12, RBMI: 0.25, RMI: 0.12 },
-    { category: 'acl3', RBIMI: 0.12, RBMI: 0.2, RMI: 0.12 },
-    { category: 'acl4', RBIMI: 0.18, RBMI: 0.21, RMI: 0.12 },
-    { category: 'acl5', RBIMI: 0.21, RBMI: 0.38, RMI: 0.12 },
-    { category: 'fw1', RBIMI: 0.12, RBMI: 0.22, RMI: 0.08 },
-    { category: 'fw2', RBIMI: 0.12, RBMI: 0.22, RMI: 0.08 },
-    { category: 'fw3', RBIMI: 0.12, RBMI: 0.2, RMI: 0.08 },
-    { category: 'fw4', RBIMI: 0.12, RBMI: 0.18, RMI: 0.08 },
-    { category: 'fw5', RBIMI: 0.15, RBMI: 0.19, RMI: 0.08 },
-    { category: 'ipc1', RBIMI: 0.18, RBMI: 0.22, RMI: 0.08 },
-    { category: 'ipc2', RBIMI: 0.25, RBMI: 0.31, RMI: 0.08 }
-  ]
+  acl: {
+    CutTSS: [
+      { r: 20, ori: 3.0, tra: 0.25 },
+      { r: 40, ori: 3.2, tra: 0.3 },
+      { r: 60, ori: 3.4, tra: 0.35 },
+      { r: 80, ori: 3.6, tra: 0.4 },
+      { r: 100, ori: 3.8, tra: 0.45 }
+    ],
+    TabTree: [
+      { r: 20, ori: 800, tra: 0.2 },
+      { r: 40, ori: 500, tra: 0.4 },
+      { r: 60, ori: 400, tra: 0.6 },
+      { r: 80, ori: 300, tra: 0.8 },
+      { r: 100, ori: 200, tra: 1.0 }
+    ],
+    MBitTree: [
+      { r: 20, ori: 300, tra: 0.8 },
+      { r: 40, ori: 100, tra: 0.7 },
+      { r: 60, ori: 80, tra: 0.6 },
+      { r: 80, ori: 60, tra: 0.5 },
+      { r: 100, ori: 50, tra: 0.4 }
+    ]
+  },
+  fw: {
+    CutTSS: [
+      { r: 20, ori: 3.1, tra: 0.28 },
+      { r: 40, ori: 3.3, tra: 0.32 },
+      { r: 60, ori: 3.5, tra: 0.38 },
+      { r: 80, ori: 3.7, tra: 0.42 },
+      { r: 100, ori: 3.9, tra: 0.48 }
+    ],
+    TabTree: [
+      { r: 20, ori: 500, tra: 0.18 },
+      { r: 40, ori: 300, tra: 0.35 },
+      { r: 60, ori: 200, tra: 0.45 },
+      { r: 80, ori: 150, tra: 0.55 },
+      { r: 100, ori: 120, tra: 0.65 }
+    ],
+    MBitTree: [
+      { r: 20, ori: 100, tra: 0.3 },
+      { r: 40, ori: 80, tra: 0.28 },
+      { r: 60, ori: 60, tra: 0.25 },
+      { r: 80, ori: 40, tra: 0.22 },
+      { r: 100, ori: 30, tra: 0.2 }
+    ]
+  },
+  ipc: {
+    CutTSS: [
+      { r: 20, ori: 3.2, tra: 0.24 },
+      { r: 40, ori: 3.4, tra: 0.31 },
+      { r: 60, ori: 3.6, tra: 0.36 },
+      { r: 80, ori: 3.8, tra: 0.41 },
+      { r: 100, ori: 4.0, tra: 0.5 }
+    ],
+    TabTree: [
+      { r: 20, ori: 300, tra: 0.22 },
+      { r: 40, ori: 200, tra: 0.28 },
+      { r: 60, ori: 180, tra: 0.35 },
+      { r: 80, ori: 150, tra: 0.45 },
+      { r: 100, ori: 120, tra: 0.55 }
+    ],
+    MBitTree: [
+      { r: 20, ori: 200, tra: 0.6 },
+      { r: 40, ori: 150, tra: 0.5 },
+      { r: 60, ori: 120, tra: 0.4 },
+      { r: 80, ori: 90, tra: 0.3 },
+      { r: 100, ori: 70, tra: 0.25 }
+    ]
+  }
 }
 
 const liveData = ref(JSON.parse(JSON.stringify(originalData)))
 
-// ✨ 更新为新的算法列表
-const algorithms = ['RBIMI', 'RBMI', 'RMI']
-
 function startDataFluctuation() {
   stopDataFluctuation()
   intervalId = window.setInterval(() => {
-    for (const key in originalData) {
-      const sizeKey = key as keyof typeof originalData
-      liveData.value[sizeKey] = originalData[sizeKey].map((item) => {
-        const newItem = { ...item } as { [key: string]: any }
-        algorithms.forEach((algo) => {
-          const originalValue = item[algo as keyof typeof item] as number
-          const multiplier = 0.9 + Math.random() * 0.2
-          newItem[algo] = parseFloat((originalValue * multiplier).toFixed(3)) // 保留3位小数以适应数据
-        })
-        return newItem
-      })
+    for (const catKey in originalData) {
+      for (const methodKey in originalData[catKey as keyof typeof originalData]) {
+        liveData.value[catKey as keyof typeof originalData][
+          methodKey as keyof (typeof originalData)['acl']
+          // ✨ 2. 更新随机数据生成逻辑的键名
+        ] = originalData[catKey as keyof typeof originalData][
+          methodKey as keyof (typeof originalData)['acl']
+        ].map((item) => ({
+          ...item,
+          ori: parseFloat((item.ori * (0.98 + Math.random() * 0.04)).toFixed(2)),
+          tra: parseFloat((item.tra * (0.95 + Math.random() * 0.1)).toFixed(2))
+        }))
+      }
     }
   }, 1000)
 }
@@ -135,98 +153,135 @@ function stopDataFluctuation() {
   }
 }
 
-const currentChartData = computed(() => {
-  if (!globalStore.isStarted || !liveData.value[selectedSize.value]) {
-    return []
+// --- 4. ECharts 配置项生成函数 ---
+
+function getChartOptions(isUpdate = false) {
+  const categoryKey = selectedCategory.value as keyof typeof liveData.value
+  const dataForCategory = liveData.value[categoryKey]
+
+  // ✨ 3. 更新系列名称和数据键名
+  const seriesNames = ['Origin', 'TransTuple']
+  const dataKeys = ['ori', 'tra']
+
+  const xAxisData: string[] = []
+  const seriesData: number[][] = [[], []]
+
+  if (dataForCategory) {
+    const methods = ['CutTSS', 'TabTree', 'MBitTree']
+    methods.forEach((method) => {
+      if (xAxisData.length > 0) {
+        xAxisData.push('')
+        seriesData.forEach((s) => s.push(NaN))
+      }
+
+      const points = dataForCategory[method as keyof typeof dataForCategory]
+      points.forEach((item: { r: any }) => {
+        xAxisData.push(`${item.r}%`)
+      })
+
+      points.forEach((item: { ori: number; tra: number }) => {
+        seriesData[0].push(item.ori)
+        seriesData[1].push(item.tra)
+      })
+    })
   }
-  return liveData.value[selectedSize.value]
-})
 
-// --- 4. ECharts 配置项 ---
-
-const chartOptions = computed(() => {
-  const categories = currentChartData.value.map((item: { category: string }) => item.category)
-
-  const series = algorithms.map((algo) => {
-    let color, symbol
-    // ✨ 更新系列样式
-    switch (algo) {
-      case 'RBIMI':
-        color = '#73b96e'
-        symbol = 'circle'
+  // ✨ 4. 更新系列配置，这次两个系列都有纹理
+  const seriesConfig = seriesNames.map((name, index) => {
+    let style = {}
+    switch (name) {
+      case 'Origin':
+        style = {
+          itemStyle: {
+            color: '#5470c6',
+            decal: { symbol: 'rect', rotation: Math.PI / 4, color: 'rgba(255,255,255,0.4)' }
+          }
+        }
         break
-      case 'RBMI':
-        color = '#f07c79'
-        symbol = 'rect'
-        break
-      case 'RMI':
-        color = '#5b8ff9'
-        symbol = 'triangle'
+      case 'TransTuple':
+        style = {
+          itemStyle: {
+            color: '#91cc75',
+            // 为绿色系列也添加纹理，使用不同的样式
+            decal: { symbol: 'line', rotation: Math.PI / 4, color: 'rgba(0,0,0,0.3)' }
+          }
+        }
         break
     }
-
-    return {
-      name: algo,
-      // ✨ 核心修改：图表类型改为 'line'
-      type: 'line',
-      // ✨ 新增：为折线图添加标记点样式
-      symbol: symbol,
-      symbolSize: 8,
-      data: currentChartData.value.map(
-        (item: { [x: string]: any }) => item[algo as keyof typeof item]
-      ),
-      itemStyle: { color } // 折线图不需要 decal
-    }
+    return { name, type: 'bar', data: seriesData[index], ...style }
   })
+
+  if (isUpdate) {
+    return {
+      xAxis: [{ data: xAxisData }],
+      series: seriesConfig
+    }
+  }
 
   return {
     animation: true,
     animationDuration: 500,
     animationDurationUpdate: 500,
-    tooltip: { trigger: 'axis' },
-    legend: {
-      top: 0,
-      textStyle: { fontSize: 12 },
-      // ✨ 让图例也显示标记点形状
-      data: algorithms.map((algo) => ({
-        name: algo,
-        icon: series.find((s) => s.name === algo)?.symbol || 'circle'
-      }))
-    },
-    grid: { top: '15%', left: '7%', right: '4%', bottom: '5%', containLabel: true },
-    xAxis: { type: 'category', data: categories },
-    yAxis: {
-      type: 'value',
-      // ✨ 更新Y轴信息
-      name: 'ε / Lookup',
-      nameLocation: 'middle',
-      nameGap: 35,
-      // ✨ 设置固定范围以优化视觉
-      min: 0,
-      max: 0.7
-    },
-    series: series
-  }
-})
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { data: seriesNames, bottom: 0 },
+    grid: { top: '8%', left: '7%', right: '4%', bottom: '15%', containLabel: true },
 
-watch(chartOptions, (newOptions, oldOptions) => {
-  if (myChart && JSON.stringify(newOptions.series) !== JSON.stringify(oldOptions?.series)) {
-    myChart.setOption(newOptions, true)
+    xAxis: [
+      {
+        type: 'category',
+        data: xAxisData,
+        axisLabel: { interval: 0, rotate: 30 },
+        axisTick: { alignWithLabel: true },
+        position: 'bottom'
+      },
+      {
+        type: 'category',
+        data: ['CutTSS', '', 'TabTree', '', 'MBitTree'],
+        position: 'bottom',
+        offset: 45,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#333', fontSize: 14, fontWeight: 'bold' }
+      }
+    ],
+    // ✨ 5. 更新 Y 轴名称和单位
+    yAxis: {
+      type: 'log',
+      name: 'Update Time (µs)',
+      nameLocation: 'middle',
+      nameGap: 50,
+      logBase: 10
+    },
+    series: seriesConfig
   }
-})
+}
+
+// --- 5. 监听器 ---
+
+watch(
+  [liveData, selectedCategory],
+  () => {
+    if (!myChart || !globalStore.isStarted) {
+      myChart?.setOption({ series: [] })
+      return
+    }
+    myChart.setOption(getChartOptions(true))
+  },
+  { deep: true }
+)
+
+watch(
+  () => globalStore.isStarted,
+  (isStarted) => {
+    if (myChart && isStarted) {
+      myChart.setOption(getChartOptions())
+    } else if (myChart && !isStarted) {
+      myChart.setOption({ series: [] })
+    }
+  }
+)
 </script>
 
 <style scoped>
-.controls-container {
-  margin: 0 10%;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.controls-container label {
-  min-width: 110px;
-  margin-right: 8px;
-  font-size: 14px;
-}
+/* 样式保持不变 */
 </style>
